@@ -1,0 +1,16 @@
+boolean.py==3.7
+certifi==2021.10.8
+colorama==0.4.4
+et-xmlfile==1.1.0
+joblib==1.1.0
+numpy==1.22.3
+openpyxl==3.0.9
+pandas==1.4.2
+python-dateutil==2.8.2
+pytz==2022.1
+scikit-learn==1.0.2
+scipy==1.8.0
+six==1.16.0
+threadpoolctl==3.1.0
+tqdm==4.64.0
+wincertstore==0.2
