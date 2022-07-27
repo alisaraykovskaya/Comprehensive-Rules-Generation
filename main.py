@@ -1,7 +1,7 @@
 from loadData import LoadData
 from binarizer import binarize_df
-from best_models import find_best_model, add_metrics, tupleList_to_df, validate_model, get_formulas, beautify_formulas
 from best_models import find_best_model_shared_f1_batch_parallel
+from sequential_exec import find_best_model_sequential
 
 from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
@@ -24,9 +24,9 @@ if __name__=='__main__':
     # target_name = 'y'
     # file_ext = 'csv'
 
-    # file_name = 'heart'
-    # target_name = 'HeartDisease'
-    # file_ext = 'csv'
+    file_name = 'heart'
+    target_name = 'HeartDisease'
+    file_ext = 'csv'
 
     # file_name = 'heart_2020'
     # target_name = 'HeartDisease'
@@ -52,19 +52,21 @@ if __name__=='__main__':
     #target_name = 'Survived'
     #file_ext = 'csv'
 
-    file_name = 'Anonym'
-    target_name = 'Target'
-    file_ext = 'xlsx'
+    # file_name = 'Anonym'
+    # target_name = 'Target'
+    # file_ext = 'xlsx'
     
     # file_name = 'Data_Miocarda'
     # target_name = 'Outcome_113_Atrial_fibrillation_'
     # file_ext = 'xlsx'
 
     """ Changeable model settings """
-    subset_size = 4
+    subset_size = 3
     process_number = cpu_count() - 3
     #process_number = 13
     pkl_reload = False
+    execution_type = 'parallel_orig'
+    # types: sequential parallel_orig parallel_reload 
 
     """ Binarizer settings"""
     unique_threshold=20
@@ -102,17 +104,7 @@ if __name__=='__main__':
     """ NOT PARALLEL TRAINING """
     if not parallel:
         print('Begin training...')
-        best_formulas = find_best_model(X_train, y_train, 2)
-        best_formulas = sorted(best_formulas, key=lambda tup: tup[0], reverse=True)
-        best_formulas = add_metrics(best_formulas, y_train)
-        models = tupleList_to_df(best_formulas)
-        print('Best model validation results:')
-        validate_result = validate_model(models['columns'][0], models['expr'][0], X_test, y_test)
-        print(validate_result)
-        get_formulas(models)
-        beautify_formulas(models)
-        models.drop('result', axis=1, inplace=True)
-        models.to_excel(f"BestModels_{file_name}.xlsx", index=False, freeze_panes=(1,1))
+        find_best_model_sequential(X_train, y_train, X_test, y_test, subset_size=subset_size, file_name=file_name)
 
     """ PARALLEL TRAINING """
     if parallel:
