@@ -2,6 +2,7 @@ from loadData import LoadData
 from binarizer import binarize_df
 from best_models import find_best_model_shared_f1_batch_parallel
 from sequential_exec import find_best_model_sequential
+from utils import log_exec
 
 from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
@@ -9,6 +10,7 @@ from multiprocessing import freeze_support, cpu_count
 import pandas as pd
 
 import os.path
+from time import time
 
 
 if __name__=='__main__':
@@ -70,7 +72,7 @@ if __name__=='__main__':
 
     """ Binarizer settings"""
     unique_threshold=20
-    q=15
+    q=5
     exceptions_threshold=0.01
     numerical_binarization='range'
     nan_threshold = 0.9
@@ -104,9 +106,15 @@ if __name__=='__main__':
     """ NOT PARALLEL TRAINING """
     if not parallel:
         print('Begin training...')
+        start_time = time()
         find_best_model_sequential(X_train, y_train, X_test, y_test, subset_size=subset_size, file_name=file_name)
+        elapsed_time = time() - start_time
+        log_exec(execution_type, subset_size, elapsed_time, process_number, batch_size)
 
     """ PARALLEL TRAINING """
     if parallel:
         print('Begin training...')
+        start_time = time()
         find_best_model_shared_f1_batch_parallel(X_train, y_train, subset_size=subset_size, process_number=process_number, batch_size=batch_size, file_name=file_name)
+        elapsed_time = time() - start_time
+        log_exec(execution_type, subset_size, elapsed_time, process_number, batch_size)

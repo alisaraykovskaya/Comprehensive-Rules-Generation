@@ -13,6 +13,8 @@ from tqdm import tqdm
 from itertools import product, combinations, permutations
 import time
 
+from utils import validate_model
+
 
 def find_best_model_sequential(X_train, y_train, X_test, y_test, subset_size, file_name):
     best_formulas = find_best_model(X_train, y_train, subset_size)
@@ -179,9 +181,6 @@ def find_best_model(df, y_true, subset_size, only_best=False):
     return best_formulas
 
 
-######################################################################################################################
-
-
 def add_metrics(best_formulas, y_true):
     for i in range(len(best_formulas)):
         metrics = compute_metrics(y_true, best_formulas[i][-1])
@@ -189,9 +188,4 @@ def add_metrics(best_formulas, y_true):
     return best_formulas
 
 
-def validate_model(columns, expr, X_test, y_test):
-    model = eval('lambda df, columns: ' + expr)
-    result = model(X_test, columns)
-    metrics = [compute_metrics(y_test, result, compute_f1=True)]
-    metrics = pd.DataFrame(data=metrics, columns=['precision_0', 'recall_0', 'precision_1', 'recall_1', 'rocauc', 'accuracy', 'f1'])
-    return metrics
+######################################################################################################################

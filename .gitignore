@@ -1,3 +1,4 @@
 
 *.pyc
 *.xlsx
+Output/exec_log.txt
