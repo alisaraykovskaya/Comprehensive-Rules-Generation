@@ -199,7 +199,27 @@ def find_sum(sum_dict,f):
         if rest_of_formula!=None: 
             sums.append(rest_of_formula) 
         return '|'.join(c for c in sums)
+    
+    
+# Function to obtain a set of parent features of a model --- add to 'model info'?
+def get_parent_set(list_of_columns):
+    return set(list(map(get_parent_feature, list_of_columns)))
 
+# Function to get parent feature's name from its binary name
+def get_parent_feature(column_name):
+     if '∈' in column_name:
+         return column_name[:column_name.index('∈')]
+     elif '<=' in column_name:
+         return column_name[:column_name.index('<=')]
+     else:
+         return column_name[:column_name.index('=')]
+
+def parent_features_similarity(parent_set1, parent_set2, threshold = subset_size):
+    if len(parent_set1.intersection(parent_set2))>=threshold:
+        return True
+    else:
+        return False
+    
 ######################################################################################################################
 
 
