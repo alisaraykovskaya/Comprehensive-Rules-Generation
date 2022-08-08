@@ -609,6 +609,7 @@ def best_model_helper(expr):
     return best_formulas
 
 
+# Initalize global varaibles to be passed to each thread
 def init_pools(df_temp, y_true_temp, subset_size_temp):
     global df
     global y_true

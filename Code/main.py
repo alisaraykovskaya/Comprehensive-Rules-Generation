@@ -10,6 +10,14 @@ import fastmetrics
 
 import os.path
 
+
+# Returns True if two models are so similar one should be filtered, False otherwise
+# Parameter metric is a string describing the similarity metric to be used
+def compare_model_similarity(model1, model2, metric, min_jac_score=.9):
+    if metric == "JAC_SCORE":
+        return fastmetrics.fast_jaccard_score(model1, model2) >= min_jac_score
+
+
 @profile
 def main():
     """ Dataset file name settings """
@@ -104,7 +112,7 @@ def main():
         j = i+1
 
         while j < len(best_formulas):
-            if fastmetrics.fast_jaccard_score(best_formulas[i][3], best_formulas[j][3]) >= min_jac_score:
+            if compare_model_similarity(best_formulas[i][3], best_formulas[j][3], min_jac_score):
                 del best_formulas[j]
                 j -= 1
 
