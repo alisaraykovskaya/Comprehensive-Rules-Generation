@@ -1,6 +1,6 @@
 from loadData import LoadData
 from binarizer import binarize_df
-from best_models import find_best_model, add_metrics, tupleList_to_df, validate_model, get_formulas, beautify_formulas
+from parallel_batch_continuous import find_best_model, add_metrics, tupleList_to_df, validate_model, get_formulas, beautify_formulas
 
 from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
