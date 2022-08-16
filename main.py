@@ -48,31 +48,31 @@ def main():
     # target_name = 'hospital_death'
     # file_ext = 'csv'
 
-    file_name = 'titanic'
-    target_name = 'Survived'
-    file_ext = 'csv'
+    # file_name = 'titanic'
+    # target_name = 'Survived'
+    # file_ext = 'csv'
 
     # file_name = 'Anonym'
     # target_name = 'Target'
     # file_ext = 'xlsx'
 
-    # file_name = 'DivideBy30'
-    # target_name = 'Divisible by 30'
-    # file_ext = 'csv'
+    file_name = 'DivideBy30'
+    target_name = 'Divisible by 30'
+    file_ext = 'csv'
 
     # file_name = 'Data_Miocarda'
     # target_name = 'Outcome_113_Atrial_fibrillation_'
     # file_ext = 'xlsx'
 
     """ Changeable model settings """
-    subset_size = 2
+    subset_size = 3
     process_number = cpu_count() - 3
     #process_number = 13
     pkl_reload = False
     min_jac_score = .90
     execution_type = 'all_in1_fast_metrics_parallel'
     # types: all_in1_fast_metrics_parallel | parallel_batch_continuous | all_in1_fast_metrics_seq | sequential
-    sim_metric = 'PARENT(list)'
+    sim_metric = 'JAC_SCORE'
     """ metrics: 
     JAC_SCORE - compatible with everything
     PARENT(list) - for all_in1 versions

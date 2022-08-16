@@ -21,8 +21,10 @@ def get_parent_feature(column_name):
          return column_name[:column_name.index('∈')]
      elif '<=' in column_name:
          return column_name[:column_name.index('<=')]
-     else:
+     elif '=' in column_name:
          return column_name[:column_name.index('=')]
+     else:
+         return column_name
 
 def parent_features_similarity(parent_set1, parent_set2, threshold = 1):
     if len(parent_set1.intersection(parent_set2))>=threshold:
