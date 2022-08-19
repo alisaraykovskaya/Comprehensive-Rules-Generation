@@ -1,7 +1,8 @@
 from loadData import LoadData
 from binarizer import binarize_df
-from parallel_batch_continuous import find_best_model, add_metrics, tupleList_to_df, validate_model, get_formulas, beautify_formulas
+# from parallel_batch_continuous import find_best_model, add_metrics, tupleList_to_df, validate_model, get_formulas, beautify_formulas
 
+from best_models import find_best_model, add_metrics, tupleList_to_df, validate_model, get_formulas, beautify_formulas
 from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
 from line_profiler_pycharm import profile
@@ -58,7 +59,7 @@ def main():
     # file_ext = 'csv'
 
     file_name = 'DivideBy30'
-    target_name = 'Divisible by 30'
+    target_name = 'Div By 30'
     file_ext = 'csv'
 
     # file_name = 'Data_Miocarda'
@@ -69,6 +70,7 @@ def main():
     subset_size = 2
     pkl_reload = False
     min_jac_score = .90
+    num_models = 1000
 
     """ Binarizer settings"""
     unique_threshold = 20
@@ -105,6 +107,7 @@ def main():
     print('Begin training...')
     best_formulas = find_best_model(X_train, y_train, subset_size, parallel, num_threads)
     best_formulas = sorted(best_formulas, key=lambda tup: tup[0], reverse=True)
+    best_formulas = best_formulas[:num_models]
 
     i = 0
 

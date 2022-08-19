@@ -513,12 +513,16 @@ def bisect_left(a, x, lo=0, hi=None, *, key=None):
 
 
 @profile
-def check_model_perfomance(result, columns, expr, y_true, best_formulas, min_f1):
+def check_model_perfomance(result, columns, expr, y_true, best_formulas, min_f1, size=100):
     f1 = fastmetrics.fast_f1_score(y_true, result)
+    best_formulas.append((f1, columns, expr, result))
 
-    if min_f1 == -1 or f1 > min_f1:
-        min_f1 = f1
+    if len(best_formulas) < size or f1 > min_f1:
         best_formulas.append((f1, columns, expr, result))
+
+        if len(best_formulas) > size:
+            best_formulas = best_formulas[:size]
+            min_f1 = best_formulas[-1][0]
 
     """ BISECT VERSION """
     # if len(best_formulas) < 1000:
