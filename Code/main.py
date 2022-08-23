@@ -60,7 +60,7 @@ def main():
 
     file_name = 'DivideBy30'
     target_name = 'Div By 30'
-    file_ext = 'csv'
+    file_ext = 'xlsx'
 
     # file_name = 'Data_Miocarda'
     # target_name = 'Outcome_113_Atrial_fibrillation_'
@@ -69,6 +69,7 @@ def main():
     """ Changeable model settings """
     subset_size = 2
     pkl_reload = False
+    metric = "JAC_SCORE"
     min_jac_score = .90
     num_models = 1000
 
@@ -115,7 +116,8 @@ def main():
         j = i+1
 
         while j < len(best_formulas):
-            if compare_model_similarity(best_formulas[i][3], best_formulas[j][3], min_jac_score):
+            if best_formulas[i][0] < 1 and \
+                    compare_model_similarity(best_formulas[i][3], best_formulas[j][3], metric, min_jac_score):
                 del best_formulas[j]
                 j -= 1
 
