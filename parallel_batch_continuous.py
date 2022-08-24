@@ -271,11 +271,6 @@ def find_best_model_shared_f1_batch_parallel(df, y_true, subset_size, metric, mi
         count = 0
         
         simple_expr = simplify_expr(expr, subset_size, variables, algebra)
-        # for i in range(subset_size):
-        #     simple_expr = simple_expr.replace(f'df[columns[{i}]]', variables[i])
-        # simple_expr = str(algebra.parse(simple_expr).simplify())
-
-        # sums = sums_generator(subset_size)
         summed_expr = find_sum(sums_generator(subset_size), simple_expr)
 
         # Replace one-charachter variables in simplified expr with 'df[columns[{i}]]'
