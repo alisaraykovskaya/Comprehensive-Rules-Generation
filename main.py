@@ -65,18 +65,18 @@ def main():
     # file_ext = 'xlsx'
 
     """ Changeable model settings """
-    subset_size = 3
+    subset_size = 2
     process_number = cpu_count() - 3
     #process_number = 13
     pkl_reload = False
     min_jac_score = .90
     execution_type = 'all_in1_fast_metrics_parallel'
     # types: all_in1_fast_metrics_parallel | parallel_batch_continuous | all_in1_fast_metrics_seq | sequential
-    sim_metric = 'JAC_SCORE'
+    sim_metric = 'PARENT_set'
     """ metrics: 
     JAC_SCORE - compatible with everything
-    PARENT(list) - for all_in1 versions
-    PARENT(set) - for batch_continuous versions
+    PARENT_list - for all_in1 versions
+    PARENT_set - for batch_continuous versions
     """
 
 
