@@ -482,16 +482,16 @@ def find_best_model_shared_f1_batch_parallel(df, y_true, subset_size, process_nu
 # Substitute "columns[column_name]" with just "column_name" in formulas
 def get_formulas(df):
     df['formula'] = df.apply(lambda x: x['expr'].replace(f'columns[0]', x['columns'][0]), axis=1)
-    for i in range(1, len(df['columns'][0])):
-        df['formula'] = df.apply(lambda x: x['formula'].replace(f'columns[{i}]', x['columns'][i]), axis=1)
+    # for i in range(1, len(df['columns'][0])):
+    #     print(i)
+    #     df['formula'] = df.apply(lambda x: x['formula'].replace(f'columns[{i}]', x['columns'][i]), axis=1)
     # df.drop('expr', axis=1, inplace=True)
 
 
 # Replace boolean python operators with NOT, AND, OR and remove dataframe syntax leftovers
 def beautify_formulas(df):
-    df['formula'] = df.apply(lambda x: x['formula'].replace('~', 'NOT_'), axis=1)
-    df['formula'] = df.apply(lambda x: x['formula'].replace('&', '   AND   '), axis=1)
-    df['formula'] = df.apply(lambda x: x['formula'].replace('|', '   OR   '), axis=1)
+    df['formula'] = df.apply(lambda x: x['formula'].replace('&', '   &   '), axis=1)
+    df['formula'] = df.apply(lambda x: x['formula'].replace('|', '   |   '), axis=1)
     df['formula'] = df.apply(lambda x: x['formula'].replace('df[', ''), axis=1)
     df['formula'] = df.apply(lambda x: x['formula'].replace(']', ''), axis=1)
 
@@ -625,7 +625,6 @@ def best_model_helper(expr):
         return []
 
     expr = simple_expr
-    print(expr)
     best_formulas = []
     min_f1 = -1
 
@@ -645,7 +644,7 @@ def best_model_helper(expr):
 
     bool_pairs = np.array(bool_pairs)
 
-    for columns in combinations(df.columns, len(bool_pairs[0])):
+    for columns in permutations(df.columns, len(bool_pairs[0])):
         result = np.full_like(y_true_np, False)
 
         df_cols = []

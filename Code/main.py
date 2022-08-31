@@ -134,6 +134,10 @@ def main():
     print('Best model validation results:')
     validate_result = validate_model(models['columns'][0], models['expr'][0], X_test, y_test)
     print(validate_result)
+
+    for form in best_formulas:
+        print(form)
+
     get_formulas(models)
     beautify_formulas(models)
     models.drop('result', axis=1, inplace=True)
