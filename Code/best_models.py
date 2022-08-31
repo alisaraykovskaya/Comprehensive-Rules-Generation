@@ -32,6 +32,35 @@ from line_profiler_pycharm import profile
 
 '''General functions'''##############################################################################################
 
+
+@vectorize
+def generate_confusion_matrix(x, y):
+    """
+    NumPy ufunc implemented with Numba that generates a confusion matrix as follows:
+    1 = True Positive, 2 = False Positive, 3 = False Negative, 4 = True Negative.
+    """
+    if x and y:
+        return 1
+
+    elif not x and y:
+        return 2
+
+    elif x and not y:
+        return 3
+
+    else:
+        return 4
+
+
+def count_confusion_matrix(y_true, y_pred):
+    matrix = generate_confusion_matrix(y_true, y_pred)
+    tp = np.count_nonzero(matrix == 1)  # True Positive
+    fp = np.count_nonzero(matrix == 2)  # False Positive
+    fn = np.count_nonzero(matrix == 3)  # False Negative
+    tn = np.count_nonzero(matrix == 4)  # True Negative
+    return tp, fp, fn, tn
+
+
 # Generator of boolean formulas in str format using truth tables
 def model_string_gen(vars_num):
     inputs = list(product([False, True], repeat=vars_num))
@@ -47,7 +76,7 @@ def model_string_gen(vars_num):
         yield expr
 
 
-# Simpify expression with boolean.py library
+# Simplify expression with boolean.py library
 # In order to simplify and find sums in expression we need to
 # replace 'df[columns[{i}]]' with one-character variables
 def simplify_expr(expr, subset_size, variables, algebra):
@@ -65,7 +94,7 @@ def tupleList_to_df(best_formulas, in_training=False, parallel=False):
     elif parallel:
         models = pd.DataFrame(data=best_formulas, columns=['f1_1', 'f1_0', 'tn', 'fp', 'fn', 'tp', 'precision_1', 'precision_0', 'recall_1', 'recall_0', 'rocauc', 'accuracy', 'elapsed_time', 'summed_expr', 'columns', 'expr', 'simple_formula'])
     else:
-        models = pd.DataFrame(data=best_formulas, columns=['precision_0', 'recall_0', 'precision_1', 'recall_1', 'rocauc', 'accuracy', 'f1', 'columns', 'expr', 'result'])
+        models = pd.DataFrame(data=best_formulas, columns=['precision_0', 'recall_0', 'precision_1', 'recall_1', 'rocauc', 'accuracy', 'tpr', 'fpr', 'fnr', 'tnr', 'f1', 'columns', 'expr', 'result'])
     return models
 
 
@@ -461,8 +490,8 @@ def get_formulas(df):
 # Replace boolean python operators with NOT, AND, OR and remove dataframe syntax leftovers
 def beautify_formulas(df):
     df['formula'] = df.apply(lambda x: x['formula'].replace('~', 'NOT_'), axis=1)
-    df['formula'] = df.apply(lambda x: x['formula'].replace('&', 'AND'), axis=1)
-    df['formula'] = df.apply(lambda x: x['formula'].replace('|', 'OR'), axis=1)
+    df['formula'] = df.apply(lambda x: x['formula'].replace('&', '   AND   '), axis=1)
+    df['formula'] = df.apply(lambda x: x['formula'].replace('|', '   OR   '), axis=1)
     df['formula'] = df.apply(lambda x: x['formula'].replace('df[', ''), axis=1)
     df['formula'] = df.apply(lambda x: x['formula'].replace(']', ''), axis=1)
 
@@ -474,10 +503,17 @@ def compute_metrics(y_true, result, compute_f1=False):
     recall_1 = recall_score(y_true, result)
     rocauc = roc_auc_score(y_true, result)
     accuracy = accuracy_score(y_true, result)
+    tp, fp, fn, tn = count_confusion_matrix(np.array(y_true), np.array(result))
+
+    tpr = tp / (tp+fn)
+    fpr = fp / (fp+tn)
+    tnr = tn / (tn+fp)
+    fnr = fn / (fn+tp)
+
     if compute_f1:
         f1 = f1_score(y_true, result)
-        return precision_0, recall_0, precision_1, recall_1, rocauc, accuracy, f1
-    return precision_0, recall_0, precision_1, recall_1, rocauc, accuracy
+        return precision_0, recall_0, precision_1, recall_1, rocauc, accuracy, tpr, fpr, fnr, tnr, f1
+    return precision_0, recall_0, precision_1, recall_1, rocauc, accuracy, tpr, fpr, fnr, tnr
 
 
 def bisect_left(a, x, lo=0, hi=None, *, key=None):
@@ -513,16 +549,9 @@ def bisect_left(a, x, lo=0, hi=None, *, key=None):
 
 
 @profile
-def check_model_perfomance(result, columns, expr, y_true, best_formulas, min_f1, size=100):
+def check_model_perfomance(result, columns, expr, y_true, best_formulas, min_f1):
     f1 = fastmetrics.fast_f1_score(y_true, result)
-
-    if len(best_formulas) < size or f1 > min_f1:
-        best_formulas.append((f1, columns, expr, result))
-
-        if len(best_formulas) > size:
-            best_formulas.sort(reverse=True)
-            best_formulas = best_formulas[:size]
-            min_f1 = best_formulas[-1][0]
+    best_formulas.append((f1, columns, expr, result))
 
     """ BISECT VERSION """
     # if len(best_formulas) < 1000:
@@ -572,9 +601,31 @@ global y_true_tmp
 global y_true_np
 global df_dict
 
+global variables
+global algebra
+global expr_set
+
 
 @profile
 def best_model_helper(expr):
+    simple_expr = simplify_expr(expr, subset_size, variables, algebra)
+
+    # Replace one-character variables in simplified expr with 'df[columns[{i}]]'
+    # for easy execution
+    for i in range(subset_size):
+        simple_expr = simple_expr.replace(variables[i], f'df[columns[{i}]]')
+
+    # If formula is a tautology
+    if simple_expr == '1':
+        return []
+
+    if simple_expr not in expr_set:
+        expr_set.add(simple_expr)
+    else:
+        return []
+
+    expr = simple_expr
+    print(expr)
     best_formulas = []
     min_f1 = -1
 
@@ -594,7 +645,7 @@ def best_model_helper(expr):
 
     bool_pairs = np.array(bool_pairs)
 
-    for columns in combinations(df.columns, subset_size):
+    for columns in combinations(df.columns, len(bool_pairs[0])):
         result = np.full_like(y_true_np, False)
 
         df_cols = []
@@ -610,6 +661,8 @@ def best_model_helper(expr):
 
         best_formulas, min_f1 = check_model_perfomance(result, columns, expr, y_true_np, best_formulas, min_f1)
 
+    best_formulas.sort(reverse=True)
+    best_formulas = best_formulas[:100]
     return best_formulas
 
 
@@ -624,6 +677,10 @@ def init_pools(df_temp, y_true_temp, subset_size_temp):
     global y_true_np
     global df_dict
 
+    global variables
+    global algebra
+    global expr_set
+
     df = df_temp
     y_true = y_true_temp
     subset_size = subset_size_temp
@@ -635,6 +692,10 @@ def init_pools(df_temp, y_true_temp, subset_size_temp):
 
     for col in df.columns:
         df_dict[col] = df[col].values
+
+    variables = list(map(chr, range(122, 122 - subset_size, -1)))
+    algebra = boolean.BooleanAlgebra()
+    expr_set = set()
 
 
 def find_best_model(df, y_true, subset_size, parallel=False, num_threads=cpu_count()):
@@ -680,5 +741,5 @@ def validate_model(columns, expr, X_test, y_test):
     model = eval('lambda df, columns: ' + expr)
     result = model(X_test, columns)
     metrics = [compute_metrics(y_test, result, compute_f1=True)]
-    metrics = pd.DataFrame(data=metrics, columns=['precision_0', 'recall_0', 'precision_1', 'recall_1', 'rocauc', 'accuracy', 'f1'])
+    metrics = pd.DataFrame(data=metrics, columns=['precision_0', 'recall_0', 'precision_1', 'recall_1', 'rocauc', 'accuracy', 'tpr', 'fpr', 'fnr', 'tnr', 'f1'])
     return metrics

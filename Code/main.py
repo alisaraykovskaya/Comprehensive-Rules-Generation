@@ -14,7 +14,7 @@ import os.path
 
 # Returns True if two models are so similar one should be filtered, False otherwise
 # Parameter metric is a string describing the similarity metric to be used
-def compare_model_similarity(model1, model2, metric, min_jac_score=.9):
+def cmp_sim(model1, model2, metric, min_jac_score=.9):
     if metric == "JAC_SCORE":
         return fastmetrics.fast_jaccard_score(model1, model2) >= min_jac_score
 
@@ -91,6 +91,10 @@ def main():
         pkl_reload = True
     if pkl_reload:
         df = LoadData(file_name, file_ext, target_name, pkl_reload=pkl_reload)
+
+        if file_name == 'DivideBy30':
+            df.drop('Number', axis=1, inplace=True)
+
         print('Binarizing data...')
         df = binarize_df(df, unique_threshold=unique_threshold, q=q, exceptions_threshold=exceptions_threshold,
                          numerical_binarization=numerical_binarization, nan_threshold=nan_threshold,
@@ -102,6 +106,7 @@ def main():
 
     y_true = df['Target']
     df.drop('Target', axis=1, inplace=True)
+
     stratify = y_true
     X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.3, stratify=stratify, random_state=12)
 
@@ -116,8 +121,7 @@ def main():
         j = i+1
 
         while j < len(best_formulas):
-            if best_formulas[i][0] < 1 and \
-                    compare_model_similarity(best_formulas[i][3], best_formulas[j][3], metric, min_jac_score):
+            if best_formulas[i][0] < 1 and cmp_sim(best_formulas[i][-1], best_formulas[j][-1], metric, min_jac_score):
                 del best_formulas[j]
                 j -= 1
 
