@@ -2,7 +2,8 @@ from loadData import LoadData
 from binarizer import binarize_df
 from parallel_batch_continuous import find_best_model_shared_f1_batch_parallel
 from sequential_exec import find_best_model_sequential
-from all_in1_fast_metrics import find_best_model_fast_metrics
+from parallel_reload import find_best_model_parallel_reload
+from parallel_formula_reload import find_best_model_parallel_formula_reload
 from utils import log_exec
 
 from sklearn.model_selection import train_test_split
@@ -57,30 +58,42 @@ def main():
     # file_ext = 'xlsx'
 
     file_name = 'DivideBy30'
-    target_name = 'Divisible by 30'
-    file_ext = 'csv'
+    target_name = 'Div By 30'
+    file_ext = 'xlsx'
 
     # file_name = 'Data_Miocarda'
     # target_name = 'Outcome_113_Atrial_fibrillation_'
     # file_ext = 'xlsx'
 
-    """ Changeable model settings """
-    subset_size = 2
-    process_number = cpu_count() - 3
-    #process_number = 13
+    """ General settings """
+    subset_size = 4
+    process_number = 10
     pkl_reload = False
-    min_jac_score = .90
-    execution_type = 'all_in1_fast_metrics_parallel'
-    # types: all_in1_fast_metrics_parallel | parallel_batch_continuous | all_in1_fast_metrics_seq | sequential
-    sim_metric = 'PARENT_set'
-    """ metrics: 
-    JAC_SCORE - compatible with everything
-    PARENT_list - for all_in1 versions
-    PARENT_set - for batch_continuous versions
+
     """
+    execution_type options:
+        1) parallel_formula_reload
+        2) parallel_reload 
+        3) parallel_batch_continuous
+        4) sequential"""
+    execution_type = 'parallel_formula_reload'
 
+    """
+    metrics options: 
+    1) JAC_SCORE
+    2) PARENT """
+    sim_metric = 'PARENT'
+    min_jac_score = 0.9
+    min_same_parents = 2
 
-    """ Binarizer settings"""
+    """ parallel_formula_reload settings """
+    formula_per_worker = 2
+    filter_similar_between_reloads = True
+    crop_number = 10000
+    workers_filter_similar = False
+    crop_number_in_workers = 1000
+
+    """ Binarizer settings """
     unique_threshold=20
     q=5
     exceptions_threshold=0.01
@@ -88,7 +101,11 @@ def main():
     nan_threshold = 0.9
     share_to_drop=0.005 #0.05
 
-    """ Better not change model settings"""
+
+    """ parallel_reload settings """
+    batch_ratio = 0.1
+
+    """ parallel_batch_continuous settings """
     batch_size = 500
 
     print('Loading data...')
@@ -115,7 +132,7 @@ def main():
         start_time = time()
         find_best_model_sequential(X_train, y_train, X_test, y_test, subset_size=subset_size, file_name=file_name)
         elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, sim_metric, subset_size, elapsed_time, process_number, batch_size)
+        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_size)
 
     elif execution_type == 'parallel_batch_continuous':
         print('Begin training...')
@@ -123,23 +140,26 @@ def main():
         find_best_model_shared_f1_batch_parallel(X_train, y_train, subset_size=subset_size, metric=sim_metric, min_jac_score=min_jac_score, \
             process_number=process_number, batch_size=batch_size, file_name=file_name)
         elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, '-', subset_size, elapsed_time, process_number, batch_size)
+        log_exec(file_name, execution_type, '-', subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_size)
 
-    elif execution_type == 'all_in1_fast_metrics_parallel':
+    elif execution_type == 'parallel_reload':
         print('Begin training...')
         start_time = time()
-        find_best_model_fast_metrics(X_train, y_train, X_test, y_test, subset_size=subset_size, parallel=True, \
-            num_threads=process_number, min_jac_score=min_jac_score, file_name=file_name, metric=sim_metric)
+        find_best_model_parallel_reload(X_train, y_train, subset_size=subset_size, metric=sim_metric, min_jac_score=min_jac_score, \
+            batch_ratio=batch_ratio, process_number=process_number, file_name=file_name, \
+            filter_similar_between_reloads=filter_similar_between_reloads, crop_number=crop_number)
         elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, sim_metric, subset_size, elapsed_time, process_number, '-')
+        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_ratio)
 
-    elif execution_type == 'all_in1_fast_metrics_seq':
+    elif execution_type == 'parallel_formula_reload':
         print('Begin training...')
         start_time = time()
-        find_best_model_fast_metrics(X_train, y_train, X_test, y_test, subset_size=subset_size, parallel=False, \
-            num_threads=process_number, min_jac_score=min_jac_score, file_name=file_name, metric=sim_metric)
+        find_best_model_parallel_formula_reload(X_train, y_train, subset_size=subset_size, metric=sim_metric, min_jac_score=min_jac_score, \
+            process_number=process_number, formula_per_worker=formula_per_worker, file_name=file_name, min_same_parents=min_same_parents, \
+            filter_similar_between_reloads=filter_similar_between_reloads, crop_number=crop_number, workers_filter_similar=workers_filter_similar, \
+            crop_number_in_workers=crop_number_in_workers)
         elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, sim_metric, subset_size, elapsed_time, process_number, '-')
+        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_ratio)
 
 if __name__=='__main__':
     # Windows flag

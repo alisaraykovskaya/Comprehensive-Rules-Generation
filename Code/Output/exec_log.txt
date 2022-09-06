@@ -1,2 +1,0 @@
-
-Batch parallel on dataset titanic with subset_size=2, process_number=4, batch_size=500 - Elapsed time 122.29875469207764 seconds

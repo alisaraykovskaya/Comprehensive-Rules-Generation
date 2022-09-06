@@ -136,7 +136,7 @@ def shared_f1_batch_collector(input, file_name, subset_size, metric, min_jac_sco
             start_time = time.time()
 
         # Collector will be adding models from workers to best_models, until number of models exceed 4000
-        if len(best_models) < 15000:
+        if len(best_models) < 20000:
             best_models.extend(models_table)
 
         # When number of collected models exceed 4000, then best_models will be sorted
@@ -147,36 +147,13 @@ def shared_f1_batch_collector(input, file_name, subset_size, metric, min_jac_sco
             best_models = sorted(best_models, key=lambda tup: tup[0], reverse=True)
             best_models = get_simple_formulas_list(best_models, subset_size)
             best_models = removeDuplicateModels(best_models)
-            best_models = best_models[:5000]
-            i = 0
-            while i < len(best_models):
-                j = i+1
-
-                while j < len(best_models):
-                    if len(best_models[i]) == 18:
-                        res1 = best_models[i][-1]
-                        columns1 = best_models[i][-2]
-                    else:
-                        res1 = best_models[i][-2]
-                        columns1 = best_models[i][-3]
-                    if len(best_models[j]) == 18:
-                        res2 = best_models[i][-1]
-                        columns2 = best_models[i][-2]
-                    else:
-                        res2 = best_models[i][-2]
-                        columns2 = best_models[i][-3]
-                    if compare_model_similarity(res1, res2, columns1, columns2, metric, min_jac_score):
-                        del best_models[j]
-                        j -= 1
-
-                    j += 1
-
-                i += 1
+            best_models = best_models[:2000]
             min_f1.value = best_models[-1][0]
 
             # Preparing models to be written in excel
             models_to_excel = tupleList_to_df(best_models, parallel_continuous=True)
             models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
+            # print(models_to_excel)
             beautify_simple(models_to_excel)
             beautify_summed(models_to_excel, subset_size, variables)
             compute_complexity_metrics(models_to_excel)
@@ -193,36 +170,38 @@ def shared_f1_batch_collector(input, file_name, subset_size, metric, min_jac_sco
 
     # Case when got 'STOP' before sorting last batches of models
     best_models = sorted(best_models, key=lambda tup: tup[0], reverse=True)
-    i = 0
-    while i < len(best_models):
-        j = i+1
+    # i = 0
+    # while i < len(best_models):
+    #     j = i+1
 
-        while j < len(best_models):
-            if len(best_models[i]) == 18:
-                res1 = best_models[i][-1]
-                columns1 = best_models[i][-2]
-            else:
-                res1 = best_models[i][-2]
-                columns1 = best_models[i][-3]
-            if len(best_models[j]) == 18:
-                res2 = best_models[i][-1]
-                columns2 = best_models[i][-2]
-            else:
-                res2 = best_models[i][-2]
-                columns2 = best_models[i][-3]
-            if compare_model_similarity(res1, res2, columns1, columns2, metric, min_jac_score):
-                del best_models[j]
-                j -= 1
+    #     while j < len(best_models):
+    #         if len(best_models[i]) == 18:
+    #             res1 = best_models[i][-1]
+    #             columns1 = best_models[i][-2]
+    #         else:
+    #             res1 = best_models[i][-2]
+    #             columns1 = best_models[i][-3]
+    #         if len(best_models[j]) == 18:
+    #             res2 = best_models[i][-1]
+    #             columns2 = best_models[i][-2]
+    #         else:
+    #             res2 = best_models[i][-2]
+    #             columns2 = best_models[i][-3]
+    #         print(type(res1), type(res2))
+    #         if compare_model_similarity(res1, res2, columns1, columns2, metric, min_jac_score):
+    #             del best_models[j]
+    #             j -= 1
 
-            j += 1
+    #         j += 1
 
-        i += 1
+    #     i += 1
     best_models = get_simple_formulas_list(best_models, subset_size)
     best_models = removeDuplicateModels(best_models)
-    best_models = best_models[:1000]
+    # best_models = best_models[:1000]
 
     models_to_excel = tupleList_to_df(best_models, parallel_continuous=True)
     models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
+    # print(models_to_excel)
     beautify_simple(models_to_excel)
     beautify_summed(models_to_excel, subset_size, variables)
     compute_complexity_metrics(models_to_excel)

@@ -17,6 +17,18 @@ import fastmetrics
 import boolean
 
 
+def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
+    i = 0
+
+    while i < len(best_models):
+        for j in range(len(best_models)-1, i, -1):
+            if compare_model_similarity(best_models[i]['result'], best_models[j]['result'], best_models[i]['columns_set'], \
+                                        best_models[j]['columns_set'], metric, min_jac_score, min_same_parents):
+                del best_models[j]
+        i += 1
+    return best_models
+
+
 # Generator of boolean formulas in str format using truth tables
 def model_string_gen(vars_num):
     inputs = list(product([False, True], repeat=vars_num))
@@ -181,12 +193,22 @@ def find_sum(sum_dict,f):
 
 
 # List of tuples (best_models) to dataframe
-def tupleList_to_df(best_formulas, all_in1=False, parallel_continuous=False):
+def tupleList_to_df(best_formulas, all_in1=False, parallel_continuous=False, reload=False):
     if all_in1:
         models = pd.DataFrame(data=best_formulas, columns=['precision_0', 'recall_0', 'precision_1', 'recall_1', 'rocauc', 'accuracy', 'f1', 'columns', 'expr', 'result'])
     elif parallel_continuous:
         models = pd.DataFrame(data=best_formulas, columns=['f1_1', 'f1_0', 'tn', 'fp', 'fn', 'tp', 'precision_1', 'precision_0', 'recall_1', 'recall_0', 'rocauc', 'accuracy', 'elapsed_time', 'summed_expr', 'columns', 'expr', 'columns_set', 'result', 'simple_formula'])
+    elif reload:
+        models = pd.DataFrame.from_records(best_formulas)
     return models
+
+
+def add_readable_simple_formulas(best_models, subset_size):
+    for j in range(len(best_models)):
+        best_models[j]['simple_formula'] = best_models[j]['expr']
+        for i in range(subset_size):
+            best_models[j]['simple_formula'] = best_models[j]['simple_formula'].replace(f'df[columns[{i}]]', best_models[j]['columns'][i])
+    return best_models
 
 
 @vectorize
@@ -241,36 +263,34 @@ def parent_features_similarity(parent_set1, parent_set2, threshold = 1):
 
 # Returns True if two models are so similar one should be filtered, False otherwise
 # Parameter metric is a string describing the similarity metric to be used
-def compare_model_similarity(model1, model2, columns1, columns2, metric, min_jac_score=.9):
+def compare_model_similarity(model1, model2, columns1, columns2, metric, min_jac_score=0.9, min_same_parents=1):
     if metric == "JAC_SCORE":
         return fastmetrics.fast_jaccard_score(model1, model2) >= min_jac_score
-    elif metric == 'PARENT_list':
-        parent_set1 = get_parent_set(columns1)
-        parent_set2 = get_parent_set(columns2)
-        return parent_features_similarity(parent_set1, parent_set2)
-    elif metric == 'PARENT_set':
+    elif metric == 'PARENT':
         # print(columns1, columns2)
-        return parent_features_similarity(columns1, columns2)
+        return parent_features_similarity(columns1, columns2, min_same_parents)
 
 
-def log_exec(file_name, execution_type, sim_metric, subset_size, elapsed_time, process_number, batch_size):
+def log_exec(file_name, execution_type, sim_metric, subset_size, rows_num, cols_num, elapsed_time, process_number, batch_size):
     if os.path.exists("./Output/log.xlsx"):
         log = pd.read_excel('./Output/log.xlsx')
         search_idx = log.loc[(log['dataset'] == file_name) & (log['execution_type'] == execution_type) & (log['sim_metric'] == sim_metric) & \
-            (log['subset_size'] == subset_size) & (log['process_number'] == process_number) & (log['batch_size'] == batch_size)].index.tolist()
+            (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
+            (log['process_number'] == process_number) & (log['batch_size'] == batch_size)].index.tolist()
         if len(search_idx) == 1:
             log.loc[search_idx, ['elapsed_time']] = elapsed_time
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
         else:
             new_row = pd.DataFrame(data={'dataset': [file_name], 'execution_type': [execution_type], 'sim_metric': [sim_metric], \
-                'subset_size': [subset_size], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'batch_size': [batch_size]})
+                'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], \
+                'process_number': [process_number], 'batch_size': [batch_size]})
             log = pd.concat([log, new_row], ignore_index=True)
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
     else:
         log = pd.DataFrame(data={'dataset': [file_name], 'execution_type': [execution_type], 'sim_metric': [sim_metric], \
-            'subset_size': [subset_size], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'batch_size': [batch_size]})
+            'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'batch_size': [batch_size]})
         with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
 
