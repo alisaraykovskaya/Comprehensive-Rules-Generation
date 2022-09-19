@@ -208,15 +208,17 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, metric, min
         if formulas_in_batch_count == formula_batch_size:
             pool = Pool(process_number-1, initializer=worker_init, initargs=(df, y_true, subset_size, metric, min_jac_score, min_same_parents, \
                         min_f1, start_time, workers_filter_similar, crop_number_in_workers))
-            print('Pool started')
+            print('\nPool started')
             new_models = pool.starmap(worker_formula_reload, formula_batch)
             pool.close()
             pool.join()
             new_models = list(chain.from_iterable(new_models))
             best_models = list(chain.from_iterable([best_models, new_models]))
+            if overall_formulas_count == formulas_number:
+                finish = True
             if crop_number is not None:
                 best_models.sort(key=lambda row: row['f1_1'], reverse=True)
-                if filter_similar_between_reloads:
+                if filter_similar_between_reloads or finish:
                     best_models = similarity_filtering(best_models, metric, min_jac_score, min_same_parents)
                 best_models = best_models[:crop_number+1]
             min_f1 = best_models[-1]['f1_1']
@@ -239,8 +241,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, metric, min
             formula_batch = []
             formulas_in_batch_count = 0
             print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
-            if overall_formulas_count == formulas_number:
-                finish = True
+
     if not finish:
         pool = Pool(process_number-1, initializer=worker_init, initargs=(df, y_true, subset_size, metric, min_jac_score, min_same_parents, \
                         min_f1, start_time, workers_filter_similar, crop_number_in_workers))
@@ -270,8 +271,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, metric, min
         else:
             models_to_excel.to_excel(f"./Output/BestModels_{file_name}_reload.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
             excel_exist = True
-        # formula_batch = []
-        # formulas_in_batch_count = 0
         overall_model_count += len(formula_batch) * models_per_formula
         print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
 

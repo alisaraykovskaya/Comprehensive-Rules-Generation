@@ -24,6 +24,8 @@ def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
         for j in range(len(best_models)-1, i, -1):
             if compare_model_similarity(best_models[i]['result'], best_models[j]['result'], best_models[i]['columns_set'], \
                                         best_models[j]['columns_set'], metric, min_jac_score, min_same_parents):
+                if best_models[i]['f1_1'] == best_models[j]['f1_1'] and len(best_models[i]['expr']) > len(best_models[j]['expr']):
+                    best_models[i] = best_models[j]
                 del best_models[j]
         i += 1
     return best_models
@@ -276,7 +278,7 @@ def log_exec(file_name, execution_type, sim_metric, subset_size, rows_num, cols_
         log = pd.read_excel('./Output/log.xlsx')
         search_idx = log.loc[(log['dataset'] == file_name) & (log['execution_type'] == execution_type) & (log['sim_metric'] == sim_metric) & \
             (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
-            (log['process_number'] == process_number) & (log['batch_size'] == batch_size)].index.tolist()
+            (log['process_number'] == process_number) & (log['formula_per_worker'] == batch_size)].index.tolist()
         if len(search_idx) == 1:
             log.loc[search_idx, ['elapsed_time']] = elapsed_time
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
@@ -284,13 +286,13 @@ def log_exec(file_name, execution_type, sim_metric, subset_size, rows_num, cols_
         else:
             new_row = pd.DataFrame(data={'dataset': [file_name], 'execution_type': [execution_type], 'sim_metric': [sim_metric], \
                 'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], \
-                'process_number': [process_number], 'batch_size': [batch_size]})
+                'process_number': [process_number], 'formula_per_worker': [batch_size]})
             log = pd.concat([log, new_row], ignore_index=True)
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
     else:
         log = pd.DataFrame(data={'dataset': [file_name], 'execution_type': [execution_type], 'sim_metric': [sim_metric], \
-            'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'batch_size': [batch_size]})
+            'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'formula_per_worker': [batch_size]})
         with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
 

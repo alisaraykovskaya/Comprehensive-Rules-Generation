@@ -61,6 +61,7 @@ if __name__=='__main__':
 
     # bool_pairs = np.array(bool_pairs)
     # print(bool_pairs)
-    a = pd.Series(True, index=list(range(2000)))
-    b = pd.Series(False, index=list(range(2000)))
-    timeit.timeit(basic(a,b))
+    # a = pd.Series(True, index=list(range(2000)))
+    # b = pd.Series(False, index=list(range(2000)))
+    # timeit.timeit(basic(a,b))
+    print(True & None)

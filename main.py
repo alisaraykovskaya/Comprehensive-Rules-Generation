@@ -1,8 +1,5 @@
 from loadData import LoadData
 from binarizer import binarize_df
-from parallel_batch_continuous import find_best_model_shared_f1_batch_parallel
-from sequential_exec import find_best_model_sequential
-from parallel_reload import find_best_model_parallel_reload
 from parallel_formula_reload import find_best_model_parallel_formula_reload
 from utils import log_exec
 
@@ -61,21 +58,22 @@ def main():
     target_name = 'Div By 30'
     file_ext = 'xlsx'
 
+    # file_name = 'DivideBy30Remainder'
+    # target_name = 'Div By 30'
+    # file_ext = 'xlsx'
+
     # file_name = 'Data_Miocarda'
     # target_name = 'Outcome_113_Atrial_fibrillation_'
     # file_ext = 'xlsx'
 
     """ General settings """
-    subset_size = 4
-    process_number = 10
+    subset_size = 2
+    process_number = 7
     pkl_reload = False
 
     """
     execution_type options:
-        1) parallel_formula_reload
-        2) parallel_reload 
-        3) parallel_batch_continuous
-        4) sequential"""
+        1) parallel_formula_reload"""
     execution_type = 'parallel_formula_reload'
 
     """
@@ -88,25 +86,19 @@ def main():
 
     """ parallel_formula_reload settings """
     formula_per_worker = 2
-    filter_similar_between_reloads = True
     crop_number = 10000
+    crop_number_in_workers = 10000
+    filter_similar_between_reloads = False # !!!!!
     workers_filter_similar = False
-    crop_number_in_workers = 1000
 
     """ Binarizer settings """
     unique_threshold=20
-    q=5
+    q=20
     exceptions_threshold=0.01
-    numerical_binarization='range'
+    numerical_binarization='threshold'
     nan_threshold = 0.9
     share_to_drop=0.005 #0.05
 
-
-    """ parallel_reload settings """
-    batch_ratio = 0.1
-
-    """ parallel_batch_continuous settings """
-    batch_size = 500
 
     print('Loading data...')
     if not pkl_reload and not os.path.exists(f'./Data/{file_name}_binarized.pkl'):
@@ -125,33 +117,9 @@ def main():
     y_true = df['Target']
     df.drop('Target', axis=1, inplace=True)
     stratify = y_true
-    X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.3, stratify=stratify, random_state=12)
+    X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=stratify, random_state=12)
 
-    if execution_type == 'sequential':
-        print('Begin training...')
-        start_time = time()
-        find_best_model_sequential(X_train, y_train, X_test, y_test, subset_size=subset_size, file_name=file_name)
-        elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_size)
-
-    elif execution_type == 'parallel_batch_continuous':
-        print('Begin training...')
-        start_time = time()
-        find_best_model_shared_f1_batch_parallel(X_train, y_train, subset_size=subset_size, metric=sim_metric, min_jac_score=min_jac_score, \
-            process_number=process_number, batch_size=batch_size, file_name=file_name)
-        elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, '-', subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_size)
-
-    elif execution_type == 'parallel_reload':
-        print('Begin training...')
-        start_time = time()
-        find_best_model_parallel_reload(X_train, y_train, subset_size=subset_size, metric=sim_metric, min_jac_score=min_jac_score, \
-            batch_ratio=batch_ratio, process_number=process_number, file_name=file_name, \
-            filter_similar_between_reloads=filter_similar_between_reloads, crop_number=crop_number)
-        elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_ratio)
-
-    elif execution_type == 'parallel_formula_reload':
+    if execution_type == 'parallel_formula_reload':
         print('Begin training...')
         start_time = time()
         find_best_model_parallel_formula_reload(X_train, y_train, subset_size=subset_size, metric=sim_metric, min_jac_score=min_jac_score, \
@@ -159,7 +127,7 @@ def main():
             filter_similar_between_reloads=filter_similar_between_reloads, crop_number=crop_number, workers_filter_similar=workers_filter_similar, \
             crop_number_in_workers=crop_number_in_workers)
         elapsed_time = time() - start_time
-        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, batch_ratio)
+        log_exec(file_name, execution_type, sim_metric, subset_size, X_train.shape[0], X_train.shape[1], elapsed_time, process_number, formula_per_worker)
 
 if __name__=='__main__':
     # Windows flag
