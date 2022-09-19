@@ -3,18 +3,15 @@ import os.path as path
 import re
 
 def change_column_name(string):
-  #убираем пробелы в начале и конце
+  #remove leading and trailing characters (spaces)
   string = re.sub('^ | $','', string)
-  #заменяем пробелы на нижнее подчеркивание и оставляем только цифры, буквы и нижнее подчеркивание
+  #substitute spaces with _ and leave only letters, digits and _ 
   string = re.sub('\W+','', string.replace(' ','_'))
-  # обрезаем название до 20 символов
-  #string = string[:20]
   return string
 
 def LoadData(df_name, file_ext, target_name, pkl_reload=False):
     
     PklFile = f'./Data/{df_name}.pkl'
-    # df_path = f'./Data/{df_name}.xlsx'
     df_path = f'./Data/{df_name}.{file_ext}'
     
     if not path.exists(PklFile):
@@ -60,7 +57,7 @@ def LoadData(df_name, file_ext, target_name, pkl_reload=False):
                             
     df.drop(columns_to_remove, axis=1, inplace=True)
 
-    #Specific preprocessing
+    #Specific preprocessing (depends on a dataset)
     # For Covid - none
     # For Bunkruption - none
     # For Miocarda

@@ -17,7 +17,6 @@ def string_preproccesing(string):
     return string
 
 
-#P.S. Колонки с малым количеством единиц собираем в колонку 'others', а колонки, где мало нулей просто убираем
 def drop_unbalanced(one_hot, column_name, numerical_binarization, share_to_drop):
     
     #create a list for the share of ones for each binarized column of one_hot dataset
