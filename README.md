@@ -1,6 +1,6 @@
 It's better to prepare new environment for execution. It can be done with:
-1) conda via yml file: ```conda env create -f boolean_ml_env.yml```
-2) pip: ```pip install -r boolean_ml_env.txt```
+1) conda via yml file: ```conda env create -f CRG_env.yml```
+2) pip (Python 3.9): ```pip install -r CRG_env.txt```
 
 ---
 

@@ -7,18 +7,23 @@ from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
 import pandas as pd
 
-import os.path
+from os import path, mkdir
+import platform
 from time import time
 import json
 
 def main():
+    if 'windows' in platform.system().lower():
+        freeze_support()
+    if not path.exists('Output'):
+        mkdir('Output')
     with open('./config.json') as config_file:
         config = json.load(config_file) 
     if config["rules_generation_params"]["process_number"]=='default':
-        config["rules_generation_params"]["process_number"] = int(cpu_count()*0.9)
+        config["rules_generation_params"]["process_number"] = int(max(cpu_count()*.9, 1))
 
     print('Loading data...')
-    if not config["load_data_params"]["pkl_reload"] and not os.path.exists(f'./Data/{config["load_data_params"]["file_name"]}_binarized.pkl'):
+    if not config["load_data_params"]["pkl_reload"] and not path.exists(f'./Data/{config["load_data_params"]["file_name"]}_binarized.pkl'):
         print('Binarized data was not found')
         config["load_data_params"]["pkl_reload"] = True
     if config["load_data_params"]["pkl_reload"]:
@@ -45,6 +50,4 @@ def main():
             elapsed_time, config["rules_generation_params"]["process_number"], config["rules_generation_params"]["formula_per_worker"])
 
 if __name__=='__main__':
-    # Windows flag
-    freeze_support()
     main()

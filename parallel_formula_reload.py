@@ -1,32 +1,22 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import f1_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
 from numba import njit
-from tqdm import tqdm
 
 import os.path
 from enum import unique
 from itertools import product, combinations, permutations, chain
 import time
-from math import comb
 from math import factorial
-import re
 
 from multiprocessing import Queue, Pool, cpu_count, Process, current_process
 #from multiprocess import Queue, Pool, cpu_count, Process, current_process
 from multiprocessing.sharedctypes import Value
 #from multiprocess.sharedctypes import Value
-import openpyxl as pxl
 import boolean
 
-from utils import model_string_gen, count_confusion_matrix, simplify_expr, add_readable_simple_formulas, find_sum, sums_generator
-from utils import tupleList_to_df, beautify_simple, beautify_summed, compute_complexity_metrics, get_parent_set, similarity_filtering
+from utils import model_string_gen, simplify_expr, add_readable_simple_formulas, find_sum, sums_generator
+from utils import tupleList_to_df, beautify_simple, beautify_summed, similarity_filtering
+from metrics_utils import count_confusion_matrix, compute_complexity_metrics, get_parent_set
 
 
 '''Reload parallel execution'''#############################################################################
@@ -143,7 +133,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
         file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, workers_filter_similar=False, crop_number_in_workers=None):
     excel_exist = False
-    if os.path.exists(f"./Output/BestModels_{file_name}_reload.xlsx"):
+    if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
 
     df_columns = df.columns
@@ -171,7 +161,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
     overall_formulas_count = 0
     overall_model_count = 0
 
-    for expr in tqdm(model_string_gen(subset_size), total=formulas_number):        
+    for expr in model_string_gen(subset_size):        
         simple_expr = simplify_expr(expr, subset_size, variables, algebra)
 
         # sums = sums_generator(subset_size)
@@ -223,17 +213,17 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
             best_models = add_readable_simple_formulas(best_models, subset_size)
 
             # Preparing models to be written in excel
-            models_to_excel = tupleList_to_df(best_models, reload=True)
+            models_to_excel = tupleList_to_df(best_models)
             models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
             beautify_simple(models_to_excel)
             beautify_summed(models_to_excel, subset_size, variables)
             compute_complexity_metrics(models_to_excel)
 
             if excel_exist:
-                with pd.ExcelWriter(f"./Output/BestModels_{file_name}_reload.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+                with pd.ExcelWriter(f"./Output/BestModels_{file_name}.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
                     models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
             else:
-                models_to_excel.to_excel(f"./Output/BestModels_{file_name}_reload.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
+                models_to_excel.to_excel(f"./Output/BestModels_{file_name}.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
                 excel_exist = True
             overall_model_count += len(formula_batch) * models_per_formula
             formula_batch = []
@@ -257,17 +247,17 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
         best_models = add_readable_simple_formulas(best_models, subset_size)
 
         # Preparing models to be written in excel
-        models_to_excel = tupleList_to_df(best_models, reload=True)
+        models_to_excel = tupleList_to_df(best_models)
         models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
         beautify_simple(models_to_excel)
         beautify_summed(models_to_excel, subset_size, variables)
         compute_complexity_metrics(models_to_excel)
 
         if excel_exist:
-            with pd.ExcelWriter(f"./Output/BestModels_{file_name}_reload.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+            with pd.ExcelWriter(f"./Output/BestModels_{file_name}.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
                 models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
         else:
-            models_to_excel.to_excel(f"./Output/BestModels_{file_name}_reload.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
+            models_to_excel.to_excel(f"./Output/BestModels_{file_name}.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
             excel_exist = True
         overall_model_count += len(formula_batch) * models_per_formula
         print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')

@@ -1,0 +1,6 @@
+boolean.py==3.7
+numba==0.56.0
+numpy==1.22.3
+openpyxl==3.0.9
+pandas==1.4.2
+scikit-learn==1.0.2
