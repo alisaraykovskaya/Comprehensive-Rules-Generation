@@ -219,6 +219,10 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
             beautify_summed(models_to_excel, subset_size, variables)
             compute_complexity_metrics(models_to_excel)
 
+            models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'accuracy', \
+                'elapsed_time', 'columns', 'summed_expr', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+            models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
+
             if excel_exist:
                 with pd.ExcelWriter(f"./Output/BestModels_{file_name}.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
                     models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
@@ -241,9 +245,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
         best_models = list(chain.from_iterable([best_models, new_models]))
         best_models.sort(key=lambda row: row['f1_1'], reverse=True)
         best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
-        # if crop_number is not None:
-        #     best_models = best_models[:crop_number+1]
-        # min_f1 = best_models[-1]['f1_1']
         best_models = add_readable_simple_formulas(best_models, subset_size)
 
         # Preparing models to be written in excel
@@ -252,6 +253,10 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
         beautify_simple(models_to_excel)
         beautify_summed(models_to_excel, subset_size, variables)
         compute_complexity_metrics(models_to_excel)
+
+        models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'accuracy', \
+            'elapsed_time', 'columns', 'summed_expr', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+        models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
         if excel_exist:
             with pd.ExcelWriter(f"./Output/BestModels_{file_name}.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
