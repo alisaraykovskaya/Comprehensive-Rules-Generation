@@ -92,14 +92,14 @@ def parent_features_similarity(parent_set1, parent_set2, threshold = 1):
 
 # Returns True if two models are so similar one should be filtered, False otherwise
 # Parameter metric is a string describing the similarity metric to be used
-def compare_model_similarity(model_dict1, model_dict2, metric, min_jac_score=0.9, min_same_parents=1, filter_exact_similar=False):
+def compare_model_similarity(model_dict1, model_dict2, metric, min_jac_score=0.9, min_same_parents=1):
     res = False
     if metric == "JAC_SCORE":
         res = fast_jaccard_score(model_dict1['result'], model_dict2['result']) >= min_jac_score
     elif metric == 'PARENT':
         # print(columns1, columns2)
         res = parent_features_similarity(model_dict1['columns_set'], model_dict2['columns_set'], min_same_parents)
-    if not res and model_dict1['simple_formula'] == model_dict2['simple_formula'] and filter_exact_similar:
+    if not res and model_dict1['simple_formula'] == model_dict2['simple_formula']:
         return True
     else:
         return False

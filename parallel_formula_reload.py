@@ -23,7 +23,7 @@ from metrics_utils import count_confusion_matrix, compute_complexity_metrics, ge
 
 
 def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, min_quality_tmp, start_time_tmp, \
-        crop_number_in_workers_tmp, dropna_on_whole_df_tmp):
+        crop_number_in_workers_tmp, dropna_on_whole_df_tmp, excessive_models_num_coef_tmp):
     global df
     global y_true
     global subset_size
@@ -33,6 +33,7 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_met
     global start_time
     global crop_number_in_workers
     global dropna_on_whole_df
+    global excessive_models_num_coef
 
     global y_true_np
     global df_dict
@@ -46,6 +47,7 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_met
     start_time = start_time_tmp
     crop_number_in_workers = crop_number_in_workers_tmp
     dropna_on_whole_df = dropna_on_whole_df_tmp
+    excessive_models_num_coef = excessive_models_num_coef_tmp
 
     df['target'] = y_true
     if dropna_on_whole_df:
@@ -66,6 +68,7 @@ global min_quality
 global start_time
 global crop_number_in_workers
 global dropna_on_whole_df
+global excessive_models_num_coef
 
 global y_true_np
 global df_dict
@@ -133,7 +136,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
             else:
                 model_info['result'] = None
             best_models.append(model_info)
-        if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * 3:
+        if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * excessive_models_num_coef:
             best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
             best_models = best_models[:crop_number_in_workers]
             min_quality = best_models[-1][quality_metric]
@@ -146,7 +149,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 
 def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
         file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, \
-        crop_number_in_workers=None, filter_exact_similar=False, dropna_on_whole_df=False, crop_features=None, desired_time_per_worker=None):
+        crop_number_in_workers=None, dropna_on_whole_df=False, excessive_models_num_coef=3, crop_features=None, desired_minutes_per_worker=None):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
@@ -156,7 +159,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
     formulas_number = 2**(2**subset_size) - 2
     models_per_formula = factorial(columns_number) / factorial(columns_number - subset_size)
     total_count = formulas_number * models_per_formula
-    print(f'columns_number: {columns_number}  formulas_number: {formulas_number}  models_per_formula: {models_per_formula}  total_count_of_models: {total_count}')
     formula_batch_size = formula_per_worker * process_number
 
     if quality_metric == 'f1':
@@ -202,7 +204,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         overall_formulas_count += 1
         if formulas_in_batch_count == formula_batch_size:
             pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
-                        min_quality, start_time, crop_number_in_workers, dropna_on_whole_df))
+                        min_quality, start_time, crop_number_in_workers, dropna_on_whole_df, excessive_models_num_coef))
             if subset_size == 1:
                 start_time = time.time()
             new_models = pool.starmap(worker_formula_reload, formula_batch)
@@ -215,7 +217,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             if crop_number is not None or finish:
                 best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
             if filter_similar_between_reloads or finish:
-                best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents, filter_exact_similar)
+                best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
             if crop_number is not None:
                 best_models = best_models[:crop_number+1]
             min_quality = best_models[-1][quality_metric]
@@ -242,11 +244,12 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             formulas_in_batch_count = 0
             elapsed_time = time.time() - start_time
             elapsed_time_per_formula = elapsed_time/overall_formulas_count
-            print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  elapsed_time_per_formula: {elapsed_time_per_formula:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
+            if subset_size != 1:
+                print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     if not finish:
         pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
-                        min_quality, start_time, crop_number_in_workers, dropna_on_whole_df))
+                        min_quality, start_time, crop_number_in_workers, dropna_on_whole_df, excessive_models_num_coef))
         new_models = pool.starmap(worker_formula_reload, formula_batch)
         pool.close()
         pool.join()
@@ -254,7 +257,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         new_models = list(chain.from_iterable(new_models))
         best_models = list(chain.from_iterable([best_models, new_models]))
         best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
-        best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents, filter_exact_similar)
+        best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
 
         # Preparing models to be written in excel
         models_to_excel = tupleList_to_df(best_models)
@@ -276,7 +279,8 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         overall_model_count += len(formula_batch) * models_per_formula
         elapsed_time = time.time() - start_time
         elapsed_time_per_formula = elapsed_time/overall_formulas_count
-        print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  elapsed_time_per_formula: {elapsed_time_per_formula:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
+        if subset_size != 1:
+            print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     average_time_per_model = elapsed_time_per_formula / models_per_formula
     print(f'average_time_per_model: {average_time_per_model:.2f}')

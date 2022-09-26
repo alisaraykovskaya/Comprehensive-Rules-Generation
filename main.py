@@ -14,13 +14,54 @@ from math import factorial
 import json
 import copy
 
+config = {
+    "load_data_params2":{
+        "file_name": "DivideBy30",
+        "target_name": "Div By 30",
+        "file_ext": "xlsx", 
+        "pkl_reload": False
+    },
+    "load_data_params":{
+        "file_name": "heart",
+        "target_name": "cardio",
+        "file_ext": "csv", 
+        "pkl_reload": False
+    },
+
+    "rules_generation_params": {
+        "quality_metric": "f1",
+        "subset_size": 2,
+        "process_number": 2,
+        "formula_per_worker": 1,
+        "crop_features": -1,
+        "crop_number": 10000,
+        "excessive_models_num_coef": 3,
+        "crop_number_in_workers": 10000,
+        "dropna_on_whole_df": False,
+        "desired_minutes_per_worker": 10
+    },
+  
+    "similarity_filtering_params": {
+        "sim_metric": "PARENT",
+        "min_jac_score": 0.9,
+        "min_same_parents": 2
+    },
+  
+    "binarizer_params": {
+        "unique_threshold": 20,
+        "q": 20,
+        "exceptions_threshold": 0.01,
+        "numerical_binarizatio": "threshold",
+        "nan_threshold": 0.9,
+        "share_to_drop": 0.005
+    } 
+}  
+
 def main():
     if 'windows' in platform.system().lower():
         freeze_support()
     if not path.exists('Output'):
         mkdir('Output')
-    with open('./config.json') as config_file:
-        config = json.load(config_file) 
     if config["rules_generation_params"]["process_number"]=='default':
         config["rules_generation_params"]["process_number"] = int(max(cpu_count()*.9, 1))
 
@@ -41,6 +82,12 @@ def main():
     df.drop('Target', axis=1, inplace=True)
     stratify = y_true
     X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=stratify, random_state=12)
+    df_columns = X_train.columns
+    columns_number = len(df_columns)
+    formulas_number = 2**(2**config['rules_generation_params']['subset_size']) - 2
+    models_per_formula = factorial(columns_number) / factorial(columns_number - config['rules_generation_params']['subset_size'])
+    total_count = formulas_number * models_per_formula
+    print(f'df_name: {config["load_data_params"]["file_name"]}  columns_number: {columns_number}  observations_number: {X_train.shape[1]}  columns_number: {columns_number}  formulas_number: {formulas_number}  models_per_formula: {models_per_formula}  total_count_of_models: {total_count}')
 
     if config['rules_generation_params']['subset_size'] != 1:
         print('\nDETERMINING FEATURE IMPORTANCES...')
@@ -54,14 +101,15 @@ def main():
             columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
             print(f'Top {config["rules_generation_params"]["crop_features"]} important features: {columns_ordered}')
         X_train = X_train[columns_ordered]
-        columns_number = len(columns_ordered)
         models_per_formula = factorial(columns_number) / factorial(columns_number - config['rules_generation_params']['subset_size'])
         minutes_per_formula = average_time_per_model * models_per_formula / 60
-        desired_time_per_worker = config['rules_generation_params']['desired_time_per_worker']
-        if minutes_per_formula > desired_time_per_worker:
+        desired_minutes_per_worker = config['rules_generation_params']['desired_minutes_per_worker']
+        if minutes_per_formula > desired_minutes_per_worker:
             print(f'One formula takes time more than desired time per worker ({minutes_per_formula}), could not determine needed settings')
         else:
-            print(f'\nApproximate number of formulas per process for each process to work {desired_time_per_worker} minutes on subset_size={config["rules_generation_params"]["subset_size"]}: {round(desired_time_per_worker / minutes_per_formula)}')
+            print(f'Approximate number of formulas per process for each process to work {desired_minutes_per_worker} minutes on subset_size={config["rules_generation_params"]["subset_size"]}: {round(desired_minutes_per_worker / minutes_per_formula)}')
+        print(f'Top 5 important features: {columns_ordered[:5]}')
+
 
     print('\nBEGIN TRAINING...')
     start_time = time()

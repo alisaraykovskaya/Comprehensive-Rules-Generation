@@ -18,12 +18,12 @@ def get_importance_order(best_1_variable_models):
     return columns_ordered
 
 
-def similarity_filtering(best_models, metric, min_jac_score, min_same_parents, filter_exact_similar):
+def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
     i = 0
 
     while i < len(best_models):
         for j in range(len(best_models)-1, i, -1):
-            if compare_model_similarity(best_models[i], best_models[j], metric, min_jac_score, min_same_parents, filter_exact_similar):
+            if compare_model_similarity(best_models[i], best_models[j], metric, min_jac_score, min_same_parents):
                 if best_models[i]['f1_1'] == best_models[j]['f1_1'] and best_models[i]['expr_len'] > best_models[j]['expr_len']:
                     best_models[i] = best_models[j]
                 del best_models[j]
