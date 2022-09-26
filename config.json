@@ -9,8 +9,8 @@
   "rules_generation_params": {
     "quality_metric": "f1",
     "subset_size": 2,
-    "process_number": 7,
-    "formula_per_worker": 2,
+    "process_number": 2,
+    "formula_per_worker": 1,
     "crop_features": -1,
     "crop_number": 10000,
     "crop_number_in_workers": 2000,

@@ -22,15 +22,15 @@ from metrics_utils import count_confusion_matrix, compute_complexity_metrics, ge
 '''Reload parallel execution'''#############################################################################
 
 
-def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, min_f1_tmp, start_time_tmp, \
-        workers_filter_similar_tmp, crop_number_in_workers_tmp):
+def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, min_f1_tmp, start_time_tmp, \
+        crop_number_in_workers_tmp):
     global df
     global y_true
     global subset_size
     global quality_metric
+    global sim_metric
     global min_f1
     global start_time
-    global workers_filter_similar
     global crop_number_in_workers
 
     global y_true_np
@@ -40,9 +40,9 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, min_f1_
     y_true = y_true_tmp
     subset_size = subset_size_tmp
     quality_metric = quality_metric_tmp
+    sim_metric = sim_metric_tmp
     min_f1 = min_f1_tmp
     start_time = start_time_tmp
-    workers_filter_similar = workers_filter_similar_tmp
     crop_number_in_workers = crop_number_in_workers_tmp
 
     df['target'] = y_true
@@ -57,9 +57,10 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, min_f1_
 global df
 global y_true
 global subset_size
+global quality_metric
+global sim_metric
 global min_f1
 global start_time
-global workers_filter_similar
 global crop_number_in_workers
 
 global y_true_np
@@ -109,7 +110,11 @@ def worker_formula_reload(formula_template, expr, summed_expr):
                 simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
             model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
                 'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, \
-                'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'simple_formula': simple_formula, 'columns_set': columns_set, 'result': result}
+                'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'simple_formula': simple_formula, 'columns_set': columns_set}
+            if sim_metric == 'JAC_SCORE':
+                model_info['result'] = result
+            else:
+                model_info['result'] = None
             best_models.append(model_info)
         if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * 3:
             best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
@@ -123,7 +128,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 
 
 def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
-        file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, workers_filter_similar=False, \
+        file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, \
         crop_number_in_workers=None, filter_exact_similar=False, crop_features=None):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
@@ -179,8 +184,8 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         formulas_in_batch_count += 1
         overall_formulas_count += 1
         if formulas_in_batch_count == formula_batch_size:
-            pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, \
-                        min_f1, start_time, workers_filter_similar, crop_number_in_workers))
+            pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
+                        min_f1, start_time, crop_number_in_workers))
             print('\nPool started')
             new_models = pool.starmap(worker_formula_reload, formula_batch)
             pool.close()
@@ -220,8 +225,8 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
 
     if not finish:
-        pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, \
-                        min_f1, start_time, workers_filter_similar, crop_number_in_workers))
+        pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
+                        min_f1, start_time, crop_number_in_workers))
         new_models = pool.starmap(worker_formula_reload, formula_batch)
         pool.close()
         pool.join()
