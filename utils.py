@@ -5,6 +5,19 @@ import os.path
 from metrics_utils import compare_model_similarity
 
 
+def get_importance_order(best_1_variable_models):
+    columns_set = set()
+    columns_ordered = []
+    for i in range(len(best_1_variable_models)):
+        column_name = best_1_variable_models[i]['columns'][0]
+        if column_name[0] == '~':
+            column_name = column_name[1:]
+        if column_name not in columns_set:
+            columns_set.add(column_name)
+            columns_ordered.append(column_name)
+    return columns_ordered
+
+
 def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
     i = 0
 

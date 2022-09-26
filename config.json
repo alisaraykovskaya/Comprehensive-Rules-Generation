@@ -7,11 +7,12 @@
 },
 
   "rules_generation_params": {
-    "subset_size": 1,
-    "process_number": 2,
-    "formula_per_worker": 1,
+    "subset_size": 3,
+    "process_number": 10,
+    "formula_per_worker": 5,
+    "crop_features": 20,
     "crop_number": 10000,
-    "crop_number_in_workers": 10000,
+    "crop_number_in_workers": 2000,
     "filter_similar_between_reloads": false,
     "workers_filter_similar": false
 },
@@ -19,7 +20,7 @@
   "similarity_filtering_params": {
     "sim_metric": "PARENT",
     "min_jac_score": 0.9,
-    "min_same_parents": 2
+    "min_same_parents": 1
 },
   
   "binarizer_params": {

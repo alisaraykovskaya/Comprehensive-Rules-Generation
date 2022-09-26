@@ -41,7 +41,7 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, metric_tmp, min_jac_score_t
     df = df_tmp
     y_true = y_true_tmp
     subset_size = subset_size_tmp
-    metric = metric_tmp
+    sim_metric = metric_tmp
     min_jac_score = min_jac_score_tmp
     min_same_parents = min_same_parents_tmp
     min_f1 = min_f1_tmp
@@ -131,7 +131,8 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 
 
 def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
-        file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, workers_filter_similar=False, crop_number_in_workers=None):
+        file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, workers_filter_similar=False, \
+        crop_number_in_workers=None, crop_features=None):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
@@ -147,9 +148,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
     # variables (one-charactered) and algebra are needed for simplifying expressions
     variables = list(map(chr, range(122, 122-subset_size,-1)))
     algebra = boolean.BooleanAlgebra()
-
-    # set of simplified expressions, because no need of processing same expressions
-    expr_set = set()
 
     start_time = time.time()
 
@@ -174,15 +172,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
 
         # If formula is a tautology
         if simple_expr == '1':
-            continue
-
-        # Check if expr already processed
-        if simple_expr not in expr_set:
-            expr_set.add(simple_expr)
-        else:
-            print('Equiv!')
-            total_count -= models_per_formula
-            formulas_number -= 1
             continue
 
         simple_tmp = simple_expr.replace('df', 'df_np_cols')
@@ -266,6 +255,8 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
             excel_exist = True
         overall_model_count += len(formula_batch) * models_per_formula
         print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
+
+    return best_models
 
 
 ######################################################################################################################
