@@ -23,7 +23,7 @@ from metrics_utils import count_confusion_matrix, compute_complexity_metrics, ge
 
 
 def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, min_f1_tmp, start_time_tmp, \
-        crop_number_in_workers_tmp):
+        crop_number_in_workers_tmp, dropna_on_whole_df_tmp):
     global df
     global y_true
     global subset_size
@@ -32,6 +32,7 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_met
     global min_f1
     global start_time
     global crop_number_in_workers
+    global dropna_on_whole_df
 
     global y_true_np
     global df_dict
@@ -44,9 +45,11 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_met
     min_f1 = min_f1_tmp
     start_time = start_time_tmp
     crop_number_in_workers = crop_number_in_workers_tmp
+    dropna_on_whole_df = dropna_on_whole_df_tmp
 
     df['target'] = y_true
-    df.dropna(inplace=True)
+    if dropna_on_whole_df:
+        df.dropna(inplace=True)
     y_true_np = df['target'].values
     df.drop(columns=['target'], inplace=True)
     df_dict = {}
@@ -62,6 +65,7 @@ global sim_metric
 global min_f1
 global start_time
 global crop_number_in_workers
+global dropna_on_whole_df
 
 global y_true_np
 global df_dict
@@ -73,25 +77,28 @@ def worker_formula_reload(formula_template, expr, summed_expr):
     df_columns = df.columns
 
     for columns in permutations(df_columns, subset_size):
-        # model = eval('lambda df, columns: ' + expr)
-
         columns = list(columns)
-        # tmp_df = df[columns]
-        # tmp_idx = ~tmp_df.isnull().any(axis=1)
-        # tmp_df = tmp_df[tmp_idx]
-        # y_true_tmp = y_true[tmp_idx].values
+        if dropna_on_whole_df:
+            tmp_df = df[columns]
+            tmp_idx = ~tmp_df.isnull().any(axis=1)
+            y_true_tmp = y_true[tmp_idx].values
 
-        df_np_cols = []
-        for col in columns:
-            # df_np_cols.append(df_dict[col][tmp_idx])
-            df_np_cols.append(df_dict[col])
-        df_np_cols = np.array(df_np_cols)
+            df_np_cols = []
+            for col in columns:
+                df_np_cols.append(df_dict[col][tmp_idx])
+            df_np_cols = np.array(df_np_cols)
 
-        # result = model(tmp_df, columns).to_numpy()
-        result = formula_template(df_np_cols)
+            result = formula_template(df_np_cols)
+            tp, fp, fn, tn = count_confusion_matrix(y_true_tmp, result)
+        else:
+            df_np_cols = []
+            for col in columns:
+                df_np_cols.append(df_dict[col])
+            df_np_cols = np.array(df_np_cols)
 
-        # tp, fp, fn, tn = count_confusion_matrix(y_true_tmp, result)
-        tp, fp, fn, tn = count_confusion_matrix(y_true_np, result)
+            result = formula_template(df_np_cols)
+            tp, fp, fn, tn = count_confusion_matrix(y_true_np, result)
+
         precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
         recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
         # Check if model passes theshold
@@ -129,7 +136,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 
 def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
         file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, \
-        crop_number_in_workers=None, filter_exact_similar=False, crop_features=None):
+        crop_number_in_workers=None, filter_exact_similar=False, dropna_on_whole_df=False, crop_features=None):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
@@ -185,7 +192,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         overall_formulas_count += 1
         if formulas_in_batch_count == formula_batch_size:
             pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
-                        min_f1, start_time, crop_number_in_workers))
+                        min_f1, start_time, crop_number_in_workers, dropna_on_whole_df))
             print('\nPool started')
             new_models = pool.starmap(worker_formula_reload, formula_batch)
             pool.close()
@@ -226,7 +233,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
 
     if not finish:
         pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
-                        min_f1, start_time, crop_number_in_workers))
+                        min_f1, start_time, crop_number_in_workers, dropna_on_whole_df))
         new_models = pool.starmap(worker_formula_reload, formula_batch)
         pool.close()
         pool.join()
