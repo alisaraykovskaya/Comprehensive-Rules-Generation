@@ -8,14 +8,14 @@
 
   "rules_generation_params": {
     "quality_metric": "f1",
-    "subset_size": 3,
-    "process_number": 10,
-    "formula_per_worker": 5,
-    "crop_features": 15,
+    "subset_size": 2,
+    "process_number": 7,
+    "formula_per_worker": 2,
+    "crop_features": -1,
     "crop_number": 10000,
     "crop_number_in_workers": 2000,
-    "filter_similar_between_reloads": false,
-    "workers_filter_similar": false
+    "filter_exact_similar": true,
+    "filter_similar_between_reloads": false
 },
   
   "similarity_filtering_params": {

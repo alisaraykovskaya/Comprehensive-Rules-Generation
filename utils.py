@@ -18,14 +18,13 @@ def get_importance_order(best_1_variable_models):
     return columns_ordered
 
 
-def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
+def similarity_filtering(best_models, metric, min_jac_score, min_same_parents, filter_exact_similar):
     i = 0
 
     while i < len(best_models):
         for j in range(len(best_models)-1, i, -1):
-            if compare_model_similarity(best_models[i]['result'], best_models[j]['result'], best_models[i]['columns_set'], \
-                                        best_models[j]['columns_set'], metric, min_jac_score, min_same_parents):
-                if best_models[i]['f1_1'] == best_models[j]['f1_1'] and len(best_models[i]['expr']) > len(best_models[j]['expr']):
+            if compare_model_similarity(best_models[i], best_models[j], metric, min_jac_score, min_same_parents, filter_exact_similar):
+                if best_models[i]['f1_1'] == best_models[j]['f1_1'] and best_models[i]['expr_len'] > best_models[j]['expr_len']:
                     best_models[i] = best_models[j]
                 del best_models[j]
         i += 1
@@ -45,7 +44,7 @@ def model_string_gen(vars_num):
         terms = []
         for j in range(len(output)):
             if output[j]:
-                terms.append(' & '.join(['df[columns[' + str(i) +']]' if input_ else '~df[columns[' + str(i) +']]' for i, input_ in enumerate(inputs[j])]))
+                terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
         if not terms:
             terms = ['False']
             continue
@@ -59,7 +58,7 @@ def model_string_gen(vars_num):
 def simplify_expr(expr, subset_size, variables, algebra):
     simple_expr = expr
     for i in range(subset_size):
-        simple_expr = simple_expr.replace(f'df[columns[{i}]]', variables[i])
+        simple_expr = simple_expr.replace(f'df_np_cols[{i}]', variables[i])
     simple_expr = str(algebra.parse(simple_expr).simplify())
     return simple_expr
 
@@ -143,7 +142,7 @@ def add_readable_simple_formulas(best_models, subset_size):
     for j in range(len(best_models)):
         best_models[j]['simple_formula'] = best_models[j]['expr']
         for i in range(subset_size):
-            best_models[j]['simple_formula'] = best_models[j]['simple_formula'].replace(f'df[columns[{i}]]', best_models[j]['columns'][i])
+            best_models[j]['simple_formula'] = best_models[j]['simple_formula'].replace(f'df_np_cols[{i}]', best_models[j]['columns'][i])
     return best_models
 
 
