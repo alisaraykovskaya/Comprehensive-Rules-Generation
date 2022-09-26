@@ -16,7 +16,8 @@
     "crop_number_in_workers": 2000,
     "filter_exact_similar": true,
     "filter_similar_between_reloads": false,
-    "dropna_on_whole_df": false
+    "dropna_on_whole_df": false,
+    "desired_time_per_worker": 10
 },
   
   "similarity_filtering_params": {

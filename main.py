@@ -10,6 +10,7 @@ import pandas as pd
 from os import path, mkdir
 import platform
 from time import time
+from math import factorial
 import json
 import copy
 
@@ -42,19 +43,27 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=stratify, random_state=12)
 
     if config['rules_generation_params']['subset_size'] != 1:
-        print('DETERMINING FEATURE IMPORTANCES...')
+        print('\nDETERMINING FEATURE IMPORTANCES...')
         config_1_variable = copy.deepcopy(config)
         config_1_variable['rules_generation_params']['subset_size'] = 1
         config_1_variable['rules_generation_params']['process_number'] = 2
         config_1_variable['rules_generation_params']['formula_per_worker'] = 1
-        best_1_variable = find_best_model_parallel_formula_reload(X_train, y_train, file_name = config_1_variable["load_data_params"]["file_name"], **config_1_variable["similarity_filtering_params"],  **config_1_variable["rules_generation_params"])
+        best_1_variable, average_time_per_model = find_best_model_parallel_formula_reload(X_train, y_train, file_name = config_1_variable["load_data_params"]["file_name"], **config_1_variable["similarity_filtering_params"],  **config_1_variable["rules_generation_params"])
         columns_ordered = get_importance_order(best_1_variable)
         if config["rules_generation_params"]["crop_features"] != -1:
             columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
             print(f'Top {config["rules_generation_params"]["crop_features"]} important features: {columns_ordered}')
         X_train = X_train[columns_ordered]
+        columns_number = len(columns_ordered)
+        models_per_formula = factorial(columns_number) / factorial(columns_number - config['rules_generation_params']['subset_size'])
+        minutes_per_formula = average_time_per_model * models_per_formula / 60
+        desired_time_per_worker = config['rules_generation_params']['desired_time_per_worker']
+        if minutes_per_formula > desired_time_per_worker:
+            print(f'One formula takes time more than desired time per worker ({minutes_per_formula}), could not determine needed settings')
+        else:
+            print(f'\nApproximate number of formulas per process for each process to work {desired_time_per_worker} minutes on subset_size={config["rules_generation_params"]["subset_size"]}: {round(desired_time_per_worker / minutes_per_formula)}')
 
-    print('BEGIN TRAINING...')
+    print('\nBEGIN TRAINING...')
     start_time = time()
     find_best_model_parallel_formula_reload(X_train, y_train, file_name = config["load_data_params"]["file_name"], **config["similarity_filtering_params"],  **config["rules_generation_params"])
     

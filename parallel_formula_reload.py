@@ -146,7 +146,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 
 def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
         file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, \
-        crop_number_in_workers=None, filter_exact_similar=False, dropna_on_whole_df=False, crop_features=None):
+        crop_number_in_workers=None, filter_exact_similar=False, dropna_on_whole_df=False, crop_features=None, desired_time_per_worker=None):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
@@ -156,7 +156,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
     formulas_number = 2**(2**subset_size) - 2
     models_per_formula = factorial(columns_number) / factorial(columns_number - subset_size)
     total_count = formulas_number * models_per_formula
-    print(f'columns number={columns_number}, formulas number={formulas_number}, models per formula={models_per_formula}, total count of models={total_count}')
+    print(f'columns_number: {columns_number}  formulas_number: {formulas_number}  models_per_formula: {models_per_formula}  total_count_of_models: {total_count}')
     formula_batch_size = formula_per_worker * process_number
 
     if quality_metric == 'f1':
@@ -203,7 +203,8 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         if formulas_in_batch_count == formula_batch_size:
             pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
                         min_quality, start_time, crop_number_in_workers, dropna_on_whole_df))
-            print('\nPool started')
+            if subset_size == 1:
+                start_time = time.time()
             new_models = pool.starmap(worker_formula_reload, formula_batch)
             pool.close()
             pool.join()
@@ -239,7 +240,9 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             overall_model_count += len(formula_batch) * models_per_formula
             formula_batch = []
             formulas_in_batch_count = 0
-            print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
+            elapsed_time = time.time() - start_time
+            elapsed_time_per_formula = elapsed_time/overall_formulas_count
+            print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  elapsed_time_per_formula: {elapsed_time_per_formula:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     if not finish:
         pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
@@ -271,9 +274,13 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             models_to_excel.to_excel(f"./Output/BestModels_{file_name}.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
             excel_exist = True
         overall_model_count += len(formula_batch) * models_per_formula
-        print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
+        elapsed_time = time.time() - start_time
+        elapsed_time_per_formula = elapsed_time/overall_formulas_count
+        print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  elapsed_time_per_formula: {elapsed_time_per_formula:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
-    return best_models
+    average_time_per_model = elapsed_time_per_formula / models_per_formula
+    print(f'average_time_per_model: {average_time_per_model:.2f}')
+    return best_models, average_time_per_model
 
 
 ######################################################################################################################
