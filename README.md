@@ -7,7 +7,7 @@ It's better to prepare new environment for execution. It can be done with:
 Parameters are located in ```config.json```:
 
 ### Rules generation settings 
-- ```quality_metrics``` - ('f1', 'accuracy', 'rocauc', 'recall', 'precision')
+- ```quality_metric``` - ('f1', 'accuracy', 'rocauc', 'recall', 'precision')
 - ```subset_size``` - size of columns subset which will be considered in formulas, i.e. number of variables in boolean formulas
 - ```process_number``` - number of processes for parallel execution (int or "defalut" = 90% of cpu)
 - ```formula_per_worker``` - number of boolean formulas passed to workers 

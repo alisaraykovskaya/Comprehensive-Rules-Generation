@@ -22,11 +22,12 @@ from metrics_utils import count_confusion_matrix, compute_complexity_metrics, ge
 '''Reload parallel execution'''#############################################################################
 
 
-def worker_init(df_tmp, y_true_tmp, subset_size_tmp, metric_tmp, min_jac_score_tmp, min_same_parents_tmp, min_f1_tmp, start_time_tmp, \
+def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, min_jac_score_tmp, min_same_parents_tmp, min_f1_tmp, start_time_tmp, \
         workers_filter_similar_tmp, crop_number_in_workers_tmp):
     global df
     global y_true
     global subset_size
+    global quality_metric
     global sim_metric
     global min_jac_score
     global min_same_parents
@@ -41,7 +42,8 @@ def worker_init(df_tmp, y_true_tmp, subset_size_tmp, metric_tmp, min_jac_score_t
     df = df_tmp
     y_true = y_true_tmp
     subset_size = subset_size_tmp
-    sim_metric = metric_tmp
+    quality_metric = quality_metric_tmp
+    sim_metric = sim_metric_tmp
     min_jac_score = min_jac_score_tmp
     min_same_parents = min_same_parents_tmp
     min_f1 = min_f1_tmp
@@ -115,22 +117,21 @@ def worker_formula_reload(formula_template, expr, summed_expr):
                 'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'columns_set': columns_set, 'result': result}
             best_models.append(model_info)
         if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * 3:
-            best_models.sort(key=lambda row: row['f1_1'], reverse=True)
+            best_models.sort(key=lambda row: row[quality_metric], reverse=True)
             if workers_filter_similar:
                 best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
             best_models = best_models[:crop_number_in_workers]
-            min_f1 = best_models[-1]['f1_1']
+            min_f1 = best_models[-1][quality_metric]
     if crop_number_in_workers is not None:
-        best_models.sort(key=lambda row: row['f1_1'], reverse=True)
+        best_models.sort(key=lambda row: row[quality_metric], reverse=True)
         if workers_filter_similar:
             best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
         best_models = best_models[:crop_number_in_workers]
-        # min_f1 = best_models[-1]['f1_1']
     return best_models
 
 
 
-def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
+def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
         file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, workers_filter_similar=False, \
         crop_number_in_workers=None, crop_features=None):
     excel_exist = False
@@ -144,6 +145,13 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
     total_count = formulas_number * models_per_formula
     print(f'columns number={columns_number}, formulas number={formulas_number}, models per formula={models_per_formula}, total count of models={total_count}')
     formula_batch_size = formula_per_worker * process_number
+
+    if quality_metric == 'f1':
+        quality_metric = 'f1_1'
+    if quality_metric == 'precision':
+        quality_metric = 'precision_1'
+    if quality_metric == 'recall':
+        quality_metric = 'recall_1'
 
     # variables (one-charactered) and algebra are needed for simplifying expressions
     variables = list(map(chr, range(122, 122-subset_size,-1)))
@@ -183,7 +191,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
         formulas_in_batch_count += 1
         overall_formulas_count += 1
         if formulas_in_batch_count == formula_batch_size:
-            pool = Pool(process_number-1, initializer=worker_init, initargs=(df, y_true, subset_size, sim_metric, min_jac_score, min_same_parents, \
+            pool = Pool(process_number-1, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, min_same_parents, \
                         min_f1, start_time, workers_filter_similar, crop_number_in_workers))
             print('\nPool started')
             new_models = pool.starmap(worker_formula_reload, formula_batch)
@@ -194,11 +202,11 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
             if overall_formulas_count == formulas_number:
                 finish = True
             if crop_number is not None:
-                best_models.sort(key=lambda row: row['f1_1'], reverse=True)
+                best_models.sort(key=lambda row: row[quality_metric], reverse=True)
                 if filter_similar_between_reloads or finish:
                     best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
                 best_models = best_models[:crop_number+1]
-            min_f1 = best_models[-1]['f1_1']
+            min_f1 = best_models[-1][quality_metric]
             best_models = add_readable_simple_formulas(best_models, subset_size)
 
             # Preparing models to be written in excel
@@ -224,7 +232,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
             print(f'processed {(overall_model_count/total_count) * 100:.1f}% models')
 
     if not finish:
-        pool = Pool(process_number-1, initializer=worker_init, initargs=(df, y_true, subset_size, sim_metric, min_jac_score, min_same_parents, \
+        pool = Pool(process_number-1, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, min_same_parents, \
                         min_f1, start_time, workers_filter_similar, crop_number_in_workers))
         new_models = pool.starmap(worker_formula_reload, formula_batch)
         pool.close()
@@ -232,7 +240,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, sim_metric,
         new_models = list(filter(None, new_models))
         new_models = list(chain.from_iterable(new_models))
         best_models = list(chain.from_iterable([best_models, new_models]))
-        best_models.sort(key=lambda row: row['f1_1'], reverse=True)
+        best_models.sort(key=lambda row: row[quality_metric], reverse=True)
         best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
         best_models = add_readable_simple_formulas(best_models, subset_size)
 

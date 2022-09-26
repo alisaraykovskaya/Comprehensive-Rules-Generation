@@ -41,17 +41,18 @@ def main():
     stratify = y_true
     X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=stratify, random_state=12)
 
-    print('DETERMINING FEATURE IMPORTANCES...')
-    config_1_variable = copy.deepcopy(config)
-    config_1_variable['rules_generation_params']['subset_size'] = 1
-    config_1_variable['rules_generation_params']['process_number'] = 2
-    config_1_variable['rules_generation_params']['formula_per_worker'] = 1
-    best_1_variable = find_best_model_parallel_formula_reload(X_train, y_train, file_name = config_1_variable["load_data_params"]["file_name"], **config_1_variable["similarity_filtering_params"],  **config_1_variable["rules_generation_params"])
-    columns_ordered = get_importance_order(best_1_variable)
-    if config["rules_generation_params"]["crop_features"] != -1:
-        columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
-        print(f'Top {config["rules_generation_params"]["crop_features"]} important features: {columns_ordered}')
-    X_train = X_train[columns_ordered]
+    if config['rules_generation_params']['subset_size'] != 1:
+        print('DETERMINING FEATURE IMPORTANCES...')
+        config_1_variable = copy.deepcopy(config)
+        config_1_variable['rules_generation_params']['subset_size'] = 1
+        config_1_variable['rules_generation_params']['process_number'] = 2
+        config_1_variable['rules_generation_params']['formula_per_worker'] = 1
+        best_1_variable = find_best_model_parallel_formula_reload(X_train, y_train, file_name = config_1_variable["load_data_params"]["file_name"], **config_1_variable["similarity_filtering_params"],  **config_1_variable["rules_generation_params"])
+        columns_ordered = get_importance_order(best_1_variable)
+        if config["rules_generation_params"]["crop_features"] != -1:
+            columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
+            print(f'Top {config["rules_generation_params"]["crop_features"]} important features: {columns_ordered}')
+        X_train = X_train[columns_ordered]
 
     print('BEGIN TRAINING...')
     start_time = time()

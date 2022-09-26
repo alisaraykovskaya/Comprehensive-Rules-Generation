@@ -7,10 +7,11 @@
 },
 
   "rules_generation_params": {
+    "quality_metric": "f1",
     "subset_size": 3,
     "process_number": 10,
     "formula_per_worker": 5,
-    "crop_features": 20,
+    "crop_features": 15,
     "crop_number": 10000,
     "crop_number_in_workers": 2000,
     "filter_similar_between_reloads": false,
@@ -20,7 +21,7 @@
   "similarity_filtering_params": {
     "sim_metric": "PARENT",
     "min_jac_score": 0.9,
-    "min_same_parents": 1
+    "min_same_parents": 2
 },
   
   "binarizer_params": {
