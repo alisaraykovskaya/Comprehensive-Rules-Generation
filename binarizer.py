@@ -116,7 +116,7 @@ def add_equal_suffix(string):
         return (s[::-1].replace(old[::-1],new[::-1], 1))[::-1]
     
     if '(' in string and ']' in string:
-        string = str(rreplace(string, '_', '∈'))
+        string = str(rreplace(string, '_', '$\in$'))
     elif '<=' not in string:
         string = str(rreplace(string, '_', '='))
         

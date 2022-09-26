@@ -118,7 +118,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
             quality = rocauc
         elif quality_metric == 'accuracy':
             quality = accuracy
-        # Check if model passes theshold
+
         if quality > min_quality:
             precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
             recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
@@ -245,7 +245,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             elapsed_time = time.time() - start_time
             elapsed_time_per_formula = elapsed_time/overall_formulas_count
             if subset_size != 1:
-                print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
+                print(f'formulas: {overall_formulas_count}  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     if not finish:
         pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
@@ -280,7 +280,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         elapsed_time = time.time() - start_time
         elapsed_time_per_formula = elapsed_time/overall_formulas_count
         if subset_size != 1:
-            print(f'formulas: {overall_formulas_count}  elapsed_time: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_time_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
+            print(f'formulas: {overall_formulas_count}  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     average_time_per_model = elapsed_time_per_formula / models_per_formula
     print(f'average_time_per_model: {average_time_per_model:.2f}')
