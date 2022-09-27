@@ -22,8 +22,8 @@ config = {
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 2,
-        "process_number": 2, # int or "defalut" = 90% of cpu
-        "formula_per_worker": 1, # number of formulas passed to each worker in each batch
+        "process_number": 'default', # int or "defalut" = 90% of cpu
+        "formula_per_worker": 3, # number of formulas passed to each worker in each batch
         "crop_features": -1, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_number": 10000, # number of best models to compute quality metric threshold
         "crop_number_in_workers": 2000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
@@ -46,7 +46,7 @@ config = {
         "numerical_binarization": "threshold", #"range"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
         "share_to_drop": 0.005, # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
-        "create_is_nan_features": False # If true for every feature that contains nans, corresponding nan indecatore feature will be created
+        "create_is_nan_features": True # If true for every feature that contains nans, corresponding nan indecatore feature will be created
     } 
 }  
 
