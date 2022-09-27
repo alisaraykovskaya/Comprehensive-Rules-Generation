@@ -137,11 +137,11 @@ def worker_formula_reload(formula_template, expr, summed_expr):
                 model_info['result'] = None
             best_models.append(model_info)
         if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * excessive_models_num_coef:
-            best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
+            best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
             best_models = best_models[:crop_number_in_workers]
             min_quality = best_models[-1][quality_metric]
     if crop_number_in_workers is not None:
-        best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
+        best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
         best_models = best_models[:crop_number_in_workers]
     return best_models
 
@@ -215,7 +215,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             if overall_formulas_count == formulas_number:
                 finish = True
             if crop_number is not None or finish:
-                best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
+                best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
             if filter_similar_between_reloads or finish:
                 best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
             if crop_number is not None:
@@ -256,7 +256,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         new_models = list(filter(None, new_models))
         new_models = list(chain.from_iterable(new_models))
         best_models = list(chain.from_iterable([best_models, new_models]))
-        best_models.sort(key=lambda row: (row[quality_metric], row['expr_len']), reverse=True)
+        best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
         best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
 
         # Preparing models to be written in excel

@@ -1,6 +1,7 @@
 import pandas as pd
 from itertools import product, combinations
 import os.path
+import copy
 
 from metrics_utils import compare_model_similarity
 
@@ -50,6 +51,17 @@ def model_string_gen(vars_num):
             continue
         expr = ' | '.join(terms)
         yield expr
+
+
+def create_feature_importance_config(main_config, columns_number):
+    config_1_variable = copy.deepcopy(main_config)
+    config_1_variable['rules_generation_params']['subset_size'] = 1
+    config_1_variable['rules_generation_params']['process_number'] = 2
+    config_1_variable['rules_generation_params']['formula_per_worker'] = 1
+    config_1_variable['rules_generation_params']['crop_number'] = columns_number * 2
+    config_1_variable['similarity_filtering_params']['sim_metric'] = 'PARENT'
+    config_1_variable['similarity_filtering_params']['min_same_parents'] = 2
+    return config_1_variable
 
 
 # Simpify expression with boolean.py library

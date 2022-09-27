@@ -31,6 +31,7 @@ Depending on size of dataset and ```subset_size``` number of models can grow exp
 - ```excessive_models_num_coef``` - coefficient that indicates how many models should be accumulated by worker before cropping. Exact number is calculated following way: ```crop_number_in_workers * excessive_models_num_coef```!!!!!!!!!!!
 - ```dropna_on_whole_df``` - If ```True``` then dropna will be performed on whole dataset before algorithm, otherwise dropna will be used for every model individually to it's subset of columns (which is slow). Almost in every case should be ```False```, but when there is need in speed can be set ```True```.
 - ```desired_minutes_per_worker``` - how many minutes would you like each worker to run. Using this parameter needed ```formula_per_worker``` for workers to run **approximately** ```desired_minutes_per_worker``` will be printed
+- ```filter_similar_between_reloads``` - If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
 
 
 ### Data loading settings
@@ -53,6 +54,7 @@ Depending on size of dataset and ```subset_size``` number of models can grow exp
 - ```numerical_binarization``` - type of numerical binarization ("range" or "threshold")
 - ```nan_threshold``` - max % of missing values allowed to process the variable
 - ```share_to_drop``` - max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns (with the least number of ones) which are joined together into 'other' category.
+- ```create_is_nan_features``` - If true for every feature that contains nans, corresponding nan indecatore feature will be created
 
 ---
 

@@ -79,10 +79,10 @@ def drop_unbalanced(one_hot, column_name, numerical_binarization, share_to_drop)
 
 
 
-def one_hot_encoding(column, column_name, numerical_binarization, share_to_drop):
+def one_hot_encoding(column, column_name, numerical_binarization, share_to_drop, create_is_nan_features):
     #if there is no nans, do not create a na column
     dummy_na = True
-    if len(column[column.isna()])==0:
+    if len(column[column.isna()])==0 or not create_is_nan_features:
         dummy_na = False
     #check if the column have only two different unique values (then create just one binary column)
     if column.dropna().nunique()==2:
@@ -133,7 +133,7 @@ def replace_nans(one_hot,column_name):
 
 
 
-def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop):
+def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop, create_is_nan_features):
     num_NA = len(df[df[column_name].isna()])
     nan_share = num_NA/len(df[column_name])
     
@@ -151,7 +151,7 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
             if (converted.nunique()>unique_threshold+1): 
                 new_column = pd.Series()
                 new_column = pd.qcut(x = converted, q=q, duplicates='drop') #NaNs remain as NaNs
-                one_hot = one_hot_encoding(new_column, column_name, numerical_binarization='False', share_to_drop=share_to_drop)
+                one_hot = one_hot_encoding(new_column, column_name, numerical_binarization='False', share_to_drop=share_to_drop, create_is_nan_features=create_is_nan_features)
                 
                 if numerical_binarization=='threshold':
                     #rename columns as 'x<=a'
@@ -173,7 +173,7 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
             #number of unique values is less than 20  -> treat as category
             else: 
                 if df[column_name].value_counts(normalize=True).max()>share_to_drop:
-                    one_hot = one_hot_encoding(df[column_name], column_name, numerical_binarization='range', share_to_drop=share_to_drop)
+                    one_hot = one_hot_encoding(df[column_name], column_name, numerical_binarization='range', share_to_drop=share_to_drop, create_is_nan_features=create_is_nan_features)
                     one_hot = replace_nans(one_hot,column_name)
                 else:
                     return None
@@ -181,7 +181,7 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
         else: #number of expeptions during convertation is large (more than 1%) -> treat as category
             if df[column_name].value_counts(normalize=True).max()>share_to_drop:
                 df[column_name] = df[column_name].apply(lambda string: string_preproccesing(str(string)))
-                one_hot = one_hot_encoding(df[column_name], column_name, numerical_binarization='range', share_to_drop=share_to_drop)
+                one_hot = one_hot_encoding(df[column_name], column_name, numerical_binarization='range', share_to_drop=share_to_drop, create_is_nan_features=create_is_nan_features)
                 one_hot = replace_nans(one_hot,column_name)
             else:
                 return None
@@ -192,11 +192,11 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
 
 
 
-def binarize_df(df, boolarize=True, unique_threshold=20, q=20, exceptions_threshold=0.01, numerical_binarization='threshold', nan_threshold = 0.8, share_to_drop=0.05):
+def binarize_df(df, boolarize=True, unique_threshold=20, q=20, exceptions_threshold=0.01, numerical_binarization='threshold', nan_threshold = 0.8, share_to_drop=0.05, create_is_nan_features=True):
     for column in df.columns:
         if column != 'Target':
             print(column)
-            binarized = binarize(df, column, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop)
+            binarized = binarize(df, column, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop, create_is_nan_features)
             if binarized is not None:
                 df = df.join(binarized)
                 df.drop(column, axis=1, inplace=True)

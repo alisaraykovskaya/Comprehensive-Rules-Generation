@@ -36,6 +36,11 @@ def LoadData(project_name, pkl_reload=False):
       target_name = "Survived"
       file_ext = "csv" 
 
+    elif project_name == "heart":
+      df_name = "heart"
+      target_name = "cardio"
+      file_ext = "csv" 
+
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       

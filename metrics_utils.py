@@ -97,12 +97,10 @@ def compare_model_similarity(model_dict1, model_dict2, metric, min_jac_score=0.9
     if metric == "JAC_SCORE":
         res = fast_jaccard_score(model_dict1['result'], model_dict2['result']) >= min_jac_score
     elif metric == 'PARENT':
-        # print(columns1, columns2)
         res = parent_features_similarity(model_dict1['columns_set'], model_dict2['columns_set'], min_same_parents)
     if not res and model_dict1['simple_formula'] == model_dict2['simple_formula']:
         return True
-    else:
-        return False
+    return res
 
 
 # Compute metrics of formula's complexity (number of binary operations and maximal frequency of variable's occurance)

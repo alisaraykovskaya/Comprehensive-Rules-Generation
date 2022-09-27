@@ -1,7 +1,7 @@
 from loadData import LoadData
 from binarizer import binarize_df
 from parallel_formula_reload import find_best_model_parallel_formula_reload
-from utils import log_exec, get_importance_order
+from utils import log_exec, get_importance_order, create_feature_importance_config
 
 from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
@@ -12,25 +12,25 @@ import platform
 from time import time
 from math import factorial
 import json
-import copy
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30RemainderNoiseNull", 
+        "project_name": "DivideBy30RemainderNull", 
         "pkl_reload": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 2,
-        "process_number": 5, # int or "defalut" = 90% of cpu
-        "formula_per_worker": 2, # number of formulas passed to each worker in each batch
+        "process_number": 2, # int or "defalut" = 90% of cpu
+        "formula_per_worker": 1, # number of formulas passed to each worker in each batch
         "crop_features": -1, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_number": 10000, # number of best models to compute quality metric threshold
-        "crop_number_in_workers": 10000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
+        "crop_number_in_workers": 2000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
         "excessive_models_num_coef": 3, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
         "dropna_on_whole_df": False, #If True, then dropna will be performed on whole dataset before algorithm, otherwise dropna will be used for every model individually to it's subset of columns (which is slow).
-        "desired_minutes_per_worker": 10
+        "desired_minutes_per_worker": 20,
+        "filter_similar_between_reloads": True # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
     },
   
     "similarity_filtering_params": {
@@ -45,8 +45,8 @@ config = {
         "exceptions_threshold": 0.01, # max % of exeptions allowed while converting a variable into numeric to treat it as numeric 
         "numerical_binarization": "threshold", #"range"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
-        "share_to_drop": 0.005 # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
-
+        "share_to_drop": 0.005, # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
+        "create_is_nan_features": False # If true for every feature that contains nans, corresponding nan indecatore feature will be created
     } 
 }  
 
@@ -75,6 +75,7 @@ def main():
     df.drop('Target', axis=1, inplace=True)
     stratify = y_true
     X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=stratify, random_state=12)
+    print(X_train.shape[1])
     df_columns = X_train.columns
     columns_number = len(df_columns)
     formulas_number = 2**(2**config['rules_generation_params']['subset_size']) - 2
@@ -84,10 +85,7 @@ def main():
 
     if config['rules_generation_params']['subset_size'] != 1:
         print('\nDETERMINING FEATURE IMPORTANCES...')
-        config_1_variable = copy.deepcopy(config)
-        config_1_variable['rules_generation_params']['subset_size'] = 1
-        config_1_variable['rules_generation_params']['process_number'] = 2
-        config_1_variable['rules_generation_params']['formula_per_worker'] = 1
+        config_1_variable = create_feature_importance_config(config, columns_number)
         best_1_variable, average_time_per_model = find_best_model_parallel_formula_reload(X_train, y_train, file_name = config_1_variable["load_data_params"]["project_name"], **config_1_variable["similarity_filtering_params"],  **config_1_variable["rules_generation_params"])
         columns_ordered = get_importance_order(best_1_variable)
         if config["rules_generation_params"]["crop_features"] != -1:
