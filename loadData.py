@@ -9,8 +9,37 @@ def change_column_name(string):
   string = re.sub('\W+','', string.replace(' ','_'))
   return string
 
-def LoadData(df_name, file_ext, target_name, pkl_reload=False):
+def LoadData(project_name, pkl_reload=False):
     
+    if project_name == "DivideBy30":
+      df_name = "DivideBy30"
+      target_name = "Div By 30"
+      file_ext = "xlsx" 
+    
+    elif project_name == "DivideBy30RemainderNoiseNull":
+      df_name = "DivideBy30RemainderNoiseNull"
+      target_name = "Div By 30"
+      file_ext = "xlsx"
+
+    elif project_name == "DivideBy30RemainderNull":
+      df_name = "DivideBy30RemainderNull"
+      target_name = "Div By 30"
+      file_ext = "xlsx"
+
+    elif project_name == "DivideBy30Remainder":
+      df_name = "DivideBy30Remainder"
+      target_name = "Div By 30"
+      file_ext = "xlsx"
+
+    elif project_name == "Titanic":
+      df_name = "titanic"
+      target_name = "Survived"
+      file_ext = "csv" 
+
+    else:
+      raise NameError('Project name is not recognized. Fix it in loadData.py file.')
+      
+
     PklFile = f'./Data/{df_name}.pkl'
     df_path = f'./Data/{df_name}.{file_ext}'
     

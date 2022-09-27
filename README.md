@@ -25,10 +25,10 @@ Depending on size of dataset and ```subset_size``` number of models can grow exp
 - ```subset_size``` - size of columns subset which will be considered in formulas, i.e. number of variables in boolean formulas
 - ```process_number``` - number of processes for parallel execution (int or "defalut" = 90% of cpu)
 - ```formula_per_worker``` - number of formulas passed to each worker in each batch
-- ```crop_features``` - leave only first ```crop_features``` important features in dataset. Needed for reducing working time if dataset has too many features
+- ```crop_features``` - the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
 - ```crop_number``` - leave only best ```crop_number``` models in best_models table after getting all outputs from workers between reloads
 - ```crop_number_in_workers``` - leave only best ```crop_number_in_workers``` models in worker's local best_models table, when worker accumulated ```crop_number_in_workers * excessive_models_num_coef``` models. Almost in every case should be equal to ```crop_number```, but when there is need in memory and speed can be lowered.
-- ```excessive_models_num_coef``` - coefficient that indicates how many models should be accumulated by worker before cropping. Exact number is calculated following way: ```crop_number_in_workers * excessive_models_num_coef```
+- ```excessive_models_num_coef``` - coefficient that indicates how many models should be accumulated by worker before cropping. Exact number is calculated following way: ```crop_number_in_workers * excessive_models_num_coef```!!!!!!!!!!!
 - ```dropna_on_whole_df``` - If ```True``` then dropna will be performed on whole dataset before algorithm, otherwise dropna will be used for every model individually to it's subset of columns (which is slow). Almost in every case should be ```False```, but when there is need in speed can be set ```True```.
 - ```desired_minutes_per_worker``` - how many minutes would you like each worker to run. Using this parameter needed ```formula_per_worker``` for workers to run **approximately** ```desired_minutes_per_worker``` will be printed
 
