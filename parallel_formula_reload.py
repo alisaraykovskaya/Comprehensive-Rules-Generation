@@ -81,7 +81,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
 
     for columns in permutations(df_columns, subset_size):
         columns = list(columns)
-        if dropna_on_whole_df:
+        if not dropna_on_whole_df:
             tmp_df = df[columns]
             tmp_idx = ~tmp_df.isnull().any(axis=1)
             y_true_tmp = y_true[tmp_idx].values
