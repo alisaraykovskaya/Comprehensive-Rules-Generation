@@ -16,13 +16,13 @@ import json
 config = {
     "load_data_params":{
         "project_name": "DivideBy30RemainderNull", 
-        "pkl_reload": False
+        "pkl_reload": True
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 2,
-        "process_number": 'default', # int or "defalut" = 90% of cpu
+        "process_number": 4, # int or "defalut" = 90% of cpu
         "formula_per_worker": 3, # number of formulas passed to each worker in each batch
         "crop_features": -1, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_number": 10000, # number of best models to compute quality metric threshold
@@ -46,7 +46,7 @@ config = {
         "numerical_binarization": "threshold", #"range"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
         "share_to_drop": 0.005, # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
-        "create_is_nan_features": True # If true for every feature that contains nans, corresponding nan indecatore feature will be created
+        "create_nan_features": True # If true for every feature that contains nans, corresponding nan indecatore feature will be created
     } 
 }  
 
@@ -75,7 +75,6 @@ def main():
     df.drop('Target', axis=1, inplace=True)
     stratify = y_true
     X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=stratify, random_state=12)
-    print(X_train.shape[1])
     df_columns = X_train.columns
     columns_number = len(df_columns)
     formulas_number = 2**(2**config['rules_generation_params']['subset_size']) - 2
