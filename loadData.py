@@ -1,6 +1,8 @@
 import pandas as pd
 import os.path as path
 import re
+import numpy as np
+import random
 
 def change_column_name(string):
   #remove leading and trailing characters (spaces)
@@ -43,7 +45,7 @@ def LoadData(project_name, pkl_reload=False):
 
     elif project_name == "heart":
       df_name = "heart"
-      target_name = "cardio"
+      target_name = "HeartDisease"
       file_ext = "csv" 
 
     else:
@@ -119,6 +121,27 @@ def LoadData(project_name, pkl_reload=False):
     if df_name == 'breast-cancer':
       df['Target'] = df['Target'].apply(lambda x: 0 if x == 'B' else 1)
       df.drop('id', axis=1, inplace=True)
+
+    if df_name == 'heart':
+      true_indices_ratio = 0.05
+      false_indices_ratio = 0.5
+
+      df['bad_feature'] = np.nan
+      true_indices = df.index[df['Target'] == True].tolist()
+      bad_feature_true_indices = random.sample(true_indices, k=int(len(true_indices) * true_indices_ratio))
+      mask_true = np.full(df.shape[0], False)
+      np.put(mask_true, bad_feature_true_indices, True)
+      mask_true = pd.Series(mask_true)
+      df['bad_feature'] = df['bad_feature'].where(~mask_true, True)
+
+      false_indices = df.index[df['Target'] == False].tolist()
+      bad_feature_false_indices = random.sample(false_indices, k=int(len(false_indices) * false_indices_ratio))
+      mask_false = np.full(df.shape[0], False)
+      np.put(mask_false, bad_feature_false_indices, True)
+      mask_false = pd.Series(mask_false)
+      df['bad_feature'] = df['bad_feature'].where(~mask_false, False)
+      print(df['bad_feature'].value_counts(normalize=True, dropna=False))
+      print(df['bad_feature'].value_counts(dropna=False))
 
     # Change column names
     df.columns = list(map(change_column_name,df.columns))

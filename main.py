@@ -11,26 +11,27 @@ from os import path, mkdir
 import platform
 from time import time
 from math import factorial
-import json
+import numpy as np
+import random
 
 config = {
     "load_data_params":{
         "project_name": "DivideBy30RemainderNull", 
-        "pkl_reload": True
+        "pkl_reload": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 2,
-        "process_number": 4, # int or "defalut" = 90% of cpu
-        "formula_per_worker": 3, # number of formulas passed to each worker in each batch
+        "subset_size": 1,
+        "process_number": 2, # int or "defalut" = 90% of cpu
+        "formula_per_worker": 1, # number of formulas passed to each worker in each batch
         "crop_features": -1, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
-        "crop_number": 10000, # number of best models to compute quality metric threshold
-        "crop_number_in_workers": 2000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
-        "excessive_models_num_coef": 3, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
-        "dropna_on_whole_df": False, #If True, then dropna will be performed on whole dataset before algorithm, otherwise dropna will be used for every model individually to it's subset of columns (which is slow).
+        "crop_number": 1000, # number of best models to compute quality metric threshold
+        "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
+        "excessive_models_num_coef": 1.2, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
+        "dropna_on_whole_df": True, #If True, then dropna will be performed on whole dataset before algorithm, otherwise dropna will be used for every model individually to it's subset of columns (which is slow).
         "desired_minutes_per_worker": 20,
-        "filter_similar_between_reloads": True # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
+        "filter_similar_between_reloads": False # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
     },
   
     "similarity_filtering_params": {
@@ -69,7 +70,7 @@ def main():
         df.to_pickle(f'./Data/{config["load_data_params"]["project_name"]}_binarized.pkl')
     else:
         print('Data was loaded from pickle')
-        df = pd.read_pickle(f'./Data/{config["load_data_params"]["project_name"]}_binarized.pkl')  
+        df = pd.read_pickle(f'./Data/{config["load_data_params"]["project_name"]}_binarized.pkl')
     
     y_true = df['Target']
     df.drop('Target', axis=1, inplace=True)
