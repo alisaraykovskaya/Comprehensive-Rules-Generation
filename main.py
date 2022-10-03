@@ -16,15 +16,15 @@ import random
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30RemainderNull", 
+        "project_name": "DivideBy30RemainderNoiseNull", 
         "pkl_reload": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 1,
-        "process_number": 2, # int or "defalut" = 90% of cpu
-        "formula_per_worker": 1, # number of formulas passed to each worker in each batch
+        "subset_size": 3,
+        "process_number": "defalut", # int or "defalut" = 90% of cpu
+        "formula_per_worker": 5, # number of formulas passed to each worker in each batch
         "crop_features": -1, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_number": 1000, # number of best models to compute quality metric threshold
         "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results

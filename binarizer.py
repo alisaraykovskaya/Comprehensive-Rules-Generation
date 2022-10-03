@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import numpy as np 
 
 #Parameters description
 
@@ -200,7 +201,7 @@ def boolarize(value):
     elif value==0:
         return False
     else:
-        return None
+        return False#np.nan
 
 
 

@@ -117,10 +117,9 @@ def worker_formula_reload(formula_template, expr, summed_expr):
                 df_np_cols.append(df_dict[col])
             df_np_cols = np.array(df_np_cols)
 
-            # result = formula_template(df_np_cols)
+            result = formula_template(df_np_cols)
             # result = np.full_like(y_true_np, np.nan)
-            result = np.array([np.nan] * y_true_np.shape[0])
-            result = predict(formula_template, df_np_cols, result)
+            # result = predict(formula_template, df_np_cols, result)
             tp, fp, fn, tn = count_confusion_matrix(y_true_np, result)
 
         precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
@@ -175,9 +174,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
 
-    if dropna_on_whole_df:
-        df = df.dropna()
-    print(np.isnan(df).any())
     df_columns = df.columns
     columns_number = len(df_columns)
     formulas_number = 2**(2**subset_size) - 2
