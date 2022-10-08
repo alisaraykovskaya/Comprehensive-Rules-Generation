@@ -18,109 +18,92 @@ from utils import model_string_gen, simplify_expr, add_readable_simple_formulas,
 from utils import tupleList_to_df, beautify_simple, beautify_summed, similarity_filtering
 from metrics_utils import count_confusion_matrix, compute_complexity_metrics, get_parent_set
 
+# from viztracer import log_sparse
+
 
 '''Reload parallel execution'''#############################################################################
 
 
-def worker_init(df_tmp, y_true_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, min_quality_tmp, start_time_tmp, \
-        crop_number_in_workers_tmp, dropna_on_whole_df_tmp, excessive_models_num_coef_tmp):
-    global df
+# @log_sparse
+def worker_init(df_dict_tmp, y_true_tmp, columns_ordered_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, min_quality_tmp, start_time_tmp, \
+        crop_number_in_workers_tmp, excessive_models_num_coef_tmp):
+    global df_dict
     global y_true
+    global columns_ordered
     global subset_size
     global quality_metric
     global sim_metric
     global min_quality
     global start_time
     global crop_number_in_workers
-    global dropna_on_whole_df
     global excessive_models_num_coef
 
-    global y_true_np
-    global df_dict
-
-    df = df_tmp
+    df_dict = df_dict_tmp
     y_true = y_true_tmp
+    columns_ordered = columns_ordered_tmp
     subset_size = subset_size_tmp
     quality_metric = quality_metric_tmp
     sim_metric = sim_metric_tmp
     min_quality = min_quality_tmp
     start_time = start_time_tmp
     crop_number_in_workers = crop_number_in_workers_tmp
-    dropna_on_whole_df = dropna_on_whole_df_tmp
     excessive_models_num_coef = excessive_models_num_coef_tmp
 
-    df['target'] = y_true
-    if dropna_on_whole_df:
-        df = df.dropna()
-    y_true_np = df['target'].values
-    df = df.drop(columns=['target'])
-    df_dict = {}
-    for col in df.columns:
-        df_dict[col] = df[col].values
 
 
-global df
+
+global df_dict
 global y_true
+global columns_ordered
 global subset_size
 global quality_metric
 global sim_metric
 global min_quality
 global start_time
 global crop_number_in_workers
-global dropna_on_whole_df
 global excessive_models_num_coef
 
-global y_true_np
-global df_dict
 
-
-@njit(nogil=True)
-def _any_nans(a):
-    for x in a:
-        if np.isnan(x): return True
-    return False
-
-
+# @log_sparse
 @njit
-def predict(formula_template, df_np_cols, result):
-    for i in range(len(result)):
-        if _any_nans(df_np_cols[:,i]):
-            continue
-        else:
-            result[i] = formula_template(df_np_cols[:,i])
-    return result
+def make_nan_mask(nan_mask, df_nan_cols, subset_size):
+    for i in range(subset_size):
+        nan_mask &= df_nan_cols[i]
+    return nan_mask
 
 
+# @log_sparse
+@njit
+def apply_nan_mask_list(pred, nan_mask):
+    for i in range(len(pred)):
+        if nan_mask[i]:
+            pred[i] = np.nan
+    return pred
 
+
+# @log_sparse
 def worker_formula_reload(formula_template, expr, summed_expr):
     global min_quality
     best_models = []
-    df_columns = df.columns
 
-    for columns in permutations(df_columns, subset_size):
+    for columns in permutations(columns_ordered, subset_size):
+    # for columns in combinations(columns_ordered, subset_size):
         columns = list(columns)
-        if not dropna_on_whole_df:
-            tmp_df = df[columns]
-            tmp_idx = ~tmp_df.isnull().any(axis=1)
-            y_true_tmp = y_true[tmp_idx].values
+        nan_mask = np.full_like(y_true, True, dtype=bool)
+        df_np_cols = []
+        df_nan_cols = []
+        for col in columns:
+            df_np_cols.append(df_dict[col]['data'])
+            df_nan_cols.append(df_dict[col]['nan_mask'])
+        df_np_cols = np.array(df_np_cols)
+        df_nan_cols = np.array(df_nan_cols)
 
-            df_np_cols = []
-            for col in columns:
-                df_np_cols.append(df_dict[col][tmp_idx])
-            df_np_cols = np.array(df_np_cols)
+        result = formula_template(df_np_cols)
+        nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
+        nan_count = np.count_nonzero(nan_mask)
+        result = apply_nan_mask_list(result, nan_mask)
 
-            result = formula_template(df_np_cols)
-            tp, fp, fn, tn = count_confusion_matrix(y_true_tmp, result)
-        else:
-            df_np_cols = []
-            for col in columns:
-                df_np_cols.append(df_dict[col])
-            df_np_cols = np.array(df_np_cols)
-
-            result = formula_template(df_np_cols)
-            # result = np.full_like(y_true_np, np.nan)
-            # result = predict(formula_template, df_np_cols, result)
-            tp, fp, fn, tn = count_confusion_matrix(y_true_np, result)
+        tp, fp, fn, tn = count_confusion_matrix(y_true, result)
 
         precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
         recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
@@ -149,7 +132,7 @@ def worker_formula_reload(formula_template, expr, summed_expr):
             for i in range(subset_size):
                 simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
             model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
-                'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, \
+                'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/y_true.shape[0], \
                 'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'simple_formula': simple_formula, 'columns_set': columns_set}
             if sim_metric == 'JAC_SCORE':
                 model_info['result'] = result
@@ -160,22 +143,19 @@ def worker_formula_reload(formula_template, expr, summed_expr):
             best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
             best_models = best_models[:crop_number_in_workers]
             min_quality = best_models[-1][quality_metric]
-    if crop_number_in_workers is not None:
-        best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
-        best_models = best_models[:crop_number_in_workers]
     return best_models
 
 
 
-def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_metric, sim_metric, min_jac_score, process_number=2, formula_per_worker=1, \
+# @log_sparse
+def find_best_model_parallel_formula_reload(df, y_true, columns_ordered, subset_size, quality_metric, sim_metric, min_jac_score, process_number=10, formula_per_worker=1, \
         file_name='tmp', min_same_parents=1, filter_similar_between_reloads=False, crop_number=None, \
-        crop_number_in_workers=None, dropna_on_whole_df=False, excessive_models_num_coef=3, crop_features=None, desired_minutes_per_worker=None):
+        crop_number_in_workers=None, excessive_models_num_coef=3, crop_features=None, feature_importance=False):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
 
-    df_columns = df.columns
-    columns_number = len(df_columns)
+    columns_number = len(columns_ordered)
     formulas_number = 2**(2**subset_size) - 2
     models_per_formula = factorial(columns_number) / factorial(columns_number - subset_size)
     total_count = formulas_number * models_per_formula
@@ -192,6 +172,11 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
     variables = list(map(chr, range(122, 122-subset_size,-1)))
     algebra = boolean.BooleanAlgebra()
 
+    df_dict = {}
+    for col in df.columns:
+        df_dict[col] = {'data': df[col].values.astype(bool), 'nan_mask': pd.isna(df[col]).values}
+    y_true = y_true.values.astype(float)
+
     start_time = time.time()
 
     best_models = []
@@ -205,7 +190,6 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
     for expr in model_string_gen(subset_size):        
         simple_expr = simplify_expr(expr, subset_size, variables, algebra)
 
-        # sums = sums_generator(subset_size)
         summed_expr = find_sum(sums_generator(subset_size), simple_expr)
 
         # Replace one-charachter variables in simplified expr with 'df[columns[{i}]]'
@@ -223,9 +207,9 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         formulas_in_batch_count += 1
         overall_formulas_count += 1
         if formulas_in_batch_count == formula_batch_size:
-            pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
-                        min_quality, start_time, crop_number_in_workers, dropna_on_whole_df, excessive_models_num_coef))
-            if subset_size == 1:
+            pool = Pool(process_number, initializer=worker_init, initargs=(df_dict, y_true, columns_ordered, subset_size, quality_metric, sim_metric, \
+                        min_quality, start_time, crop_number_in_workers, excessive_models_num_coef))
+            if feature_importance:
                 start_time = time.time()
             new_models = pool.starmap(worker_formula_reload, formula_batch)
             pool.close()
@@ -238,7 +222,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
                 best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
             if filter_similar_between_reloads or finish:
                 best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
-            if crop_number is not None:
+            if crop_number is not None and not finish:
                 best_models = best_models[:crop_number+1]
             min_quality = best_models[-1][quality_metric]
 
@@ -249,7 +233,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             beautify_summed(models_to_excel, subset_size, variables)
             compute_complexity_metrics(models_to_excel)
 
-            models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'accuracy', \
+            models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
                 'elapsed_time', 'columns', 'summed_expr', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
             models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
@@ -264,16 +248,15 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
             formulas_in_batch_count = 0
             elapsed_time = time.time() - start_time
             elapsed_time_per_formula = elapsed_time/overall_formulas_count
-            if subset_size != 1:
+            if not feature_importance:
                 print(f'formulas: {overall_formulas_count}  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     if not finish:
-        pool = Pool(process_number, initializer=worker_init, initargs=(df, y_true, subset_size, quality_metric, sim_metric, \
-                        min_quality, start_time, crop_number_in_workers, dropna_on_whole_df, excessive_models_num_coef))
+        pool = Pool(process_number, initializer=worker_init, initargs=(df_dict, y_true, columns_ordered, subset_size, quality_metric, sim_metric, \
+                        min_quality, start_time, crop_number_in_workers, excessive_models_num_coef))
         new_models = pool.starmap(worker_formula_reload, formula_batch)
         pool.close()
         pool.join()
-        new_models = list(filter(None, new_models))
         new_models = list(chain.from_iterable(new_models))
         best_models = list(chain.from_iterable([best_models, new_models]))
         best_models.sort(key=lambda row: (row[quality_metric], -row['expr_len']), reverse=True)
@@ -286,7 +269,7 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         beautify_summed(models_to_excel, subset_size, variables)
         compute_complexity_metrics(models_to_excel)
 
-        models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'accuracy', \
+        models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
             'elapsed_time', 'columns', 'summed_expr', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
         models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
@@ -299,12 +282,14 @@ def find_best_model_parallel_formula_reload(df, y_true, subset_size, quality_met
         overall_model_count += len(formula_batch) * models_per_formula
         elapsed_time = time.time() - start_time
         elapsed_time_per_formula = elapsed_time/overall_formulas_count
-        if subset_size != 1:
+        if not feature_importance:
             print(f'formulas: {overall_formulas_count}  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(formulas_number - overall_formulas_count) * elapsed_time_per_formula:.2f}')
 
     average_time_per_model = elapsed_time_per_formula / models_per_formula
-    print(f'average_time_per_model: {average_time_per_model:.2f}')
-    return best_models, average_time_per_model
+    # print(f'average_time_per_model: {average_time_per_model:.2f}')
+    if not feature_importance:
+        print(f'elapsed_seconds: {elapsed_time:.2f}')
+    return best_models
 
 
 ######################################################################################################################

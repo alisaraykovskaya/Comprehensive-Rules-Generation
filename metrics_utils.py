@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import vectorize
 import re
+# from viztracer import log_sparse
 
 
 @vectorize
@@ -10,7 +11,10 @@ def generate_confusion_matrix(x, y):
     NumPy ufunc implemented with Numba that generates a confusion matrix as follows:
     1 = True Positive, 2 = False Positive, 3 = False Negative, 4 = True Negative.
     """
-    if x and y:
+    if np.isnan(y):
+        return 5
+
+    elif x and y:
         return 1
 
     elif not x and y:
@@ -23,6 +27,7 @@ def generate_confusion_matrix(x, y):
         return 4
 
 
+# @log_sparse
 def count_confusion_matrix(y_true, y_pred):
     matrix = generate_confusion_matrix(y_true, y_pred)
     tp = np.count_nonzero(matrix == 1)  # True Positive
@@ -104,6 +109,7 @@ def compare_model_similarity(model_dict1, model_dict2, metric, min_jac_score=0.9
 
 
 # Compute metrics of formula's complexity (number of binary operations and maximal frequency of variable's occurance)
+# @log_sparse
 def compute_complexity_metrics(df):
     def count_operators(s):
         return s.count('|') + s.count('&') + s.count('sum')

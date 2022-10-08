@@ -28,6 +28,11 @@ def LoadData(project_name, pkl_reload=False):
       target_name = "Div By 30"
       file_ext = "xlsx"
 
+    elif project_name == "DivideBy30RemainderNoise":
+      df_name = "DivideBy30RemainderNoise"
+      target_name = "Div By 30"
+      file_ext = "xlsx"
+
     elif project_name == "DivideBy30Remainder":
       df_name = "DivideBy30Remainder"
       target_name = "Div By 30"

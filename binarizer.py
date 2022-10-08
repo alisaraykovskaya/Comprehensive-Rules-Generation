@@ -201,7 +201,7 @@ def boolarize(value):
     elif value==0:
         return False
     else:
-        return False#np.nan
+        return np.nan
 
 
 

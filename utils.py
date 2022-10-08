@@ -4,6 +4,7 @@ import os.path
 import copy
 
 from metrics_utils import compare_model_similarity
+# from viztracer import log_sparse
 
 
 def get_importance_order(best_1_variable_models):
@@ -19,6 +20,7 @@ def get_importance_order(best_1_variable_models):
     return columns_ordered
 
 
+# @log_sparse
 def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
     i = 0
 
@@ -33,6 +35,7 @@ def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
 
 
 # List of tuples (best_models) to dataframe
+# @log_sparse
 def tupleList_to_df(best_formulas):
     models = pd.DataFrame.from_records(best_formulas)
     return models
@@ -59,8 +62,10 @@ def create_feature_importance_config(main_config, columns_number):
     config_1_variable['rules_generation_params']['process_number'] = 2
     config_1_variable['rules_generation_params']['formula_per_worker'] = 1
     config_1_variable['rules_generation_params']['crop_number'] = columns_number * 2
+    config_1_variable['rules_generation_params']['feature_importance'] = True
     config_1_variable['similarity_filtering_params']['sim_metric'] = 'PARENT'
     config_1_variable['similarity_filtering_params']['min_same_parents'] = 2
+    
     return config_1_variable
 
 
@@ -158,12 +163,14 @@ def add_readable_simple_formulas(best_models, subset_size):
     return best_models
 
 
+# @log_sparse
 def beautify_simple(df):
     df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('~', ' ~'), axis=1)
     df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('&', ' & '), axis=1)
     df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('|', ' | '), axis=1)
 
 
+# @log_sparse
 def beautify_summed(df, subset_size, variables):
     df['summed_expr'] = df.apply(lambda x: x['summed_expr'].replace('\'', '') if x['summed_expr'] is not None else None, axis=1)
     df['summed_expr'] = df.apply(lambda x: x['summed_expr'].replace('{', '').replace('}', '') if x['summed_expr'] is not None else None, axis=1)
