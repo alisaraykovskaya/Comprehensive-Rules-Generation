@@ -15,7 +15,7 @@ from multiprocessing.sharedctypes import Value
 
 from utils import model_string_gen, simplify_expr, add_readable_simple_formulas, find_sum, sums_generator
 from utils import tupleList_to_df, beautify_simple, beautify_summed, similarity_filtering
-from metrics_utils import count_confusion_matrix, compute_complexity_metrics, get_parent_set, count_operators, count_vars
+from metrics_utils import count_confusion_matrix, get_parent_set, count_operators, count_vars, count_actual_subset_size
 
 
 def worker_init(df_dict_tmp, y_true_tmp, all_formulas_tmp, columns_ordered_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, \
@@ -148,9 +148,7 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
         excel_exist = True
 
     columns_number = len(columns_ordered)
-    formulas_number = 2**(2**subset_size) - 2
     subset_number = int(factorial(columns_number) / factorial(columns_number - subset_size))
-    total_model_count = formulas_number * subset_number
 
     if batch_size > subset_number:
         batch_size = subset_number
@@ -174,20 +172,21 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
     all_formulas = []
     for expr in model_string_gen(subset_size):        
         simple_expr = simplify_expr(expr, subset_size, variables, algebra)
-
-        summed_expr = find_sum(sums_generator(subset_size), simple_expr)
-
+        # If formula is a tautology
+        if simple_expr == '1':
+            continue
+        actual_subset_size = count_actual_subset_size(simple_expr)
+        if actual_subset_size < subset_size:
+            continue
         number_of_binary_operators = count_operators(simple_expr)
         max_freq_of_variables = count_vars(simple_expr)
+
+        summed_expr = find_sum(sums_generator(subset_size), simple_expr)
 
         # Replace one-charachter variables in simplified expr with 'df[columns[{i}]]'
         # for easy execution
         for i in range(subset_size):
             simple_expr = simple_expr.replace(variables[i], f'df_np_cols[{i}]')
-
-        # If formula is a tautology
-        if simple_expr == '1':
-            continue
 
         all_formulas.append({
             'formula_template': eval(f'njit(lambda df_np_cols: {simple_expr})'),
@@ -196,6 +195,10 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
             'number_of_binary_operators': number_of_binary_operators,
             'max_freq_of_variables': max_freq_of_variables
         })
+    formulas_number = len(all_formulas)
+    total_model_count = formulas_number * subset_number
+    if not feature_importance:
+        print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_model_count}')
 
     worker_timer = time.time()
     pool = Pool(process_number, initializer=worker_init, initargs=(df_dict, y_true, all_formulas, columns_ordered, subset_size, quality_metric, \

@@ -1,6 +1,5 @@
 from loadData import LoadData
 from binarizer import binarize_df
-from parallel_formula_reload import find_best_model_parallel_formula_reload
 from best_models import find_best_models
 from utils import log_exec, get_importance_order, create_feature_importance_config
 
@@ -25,7 +24,7 @@ config = {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 3,
         "process_number": 'default', # int or "default" = 90% of cpu
-        "batch_size": 10000, # 
+        "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
         "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_number": 1000, # number of best models to compute quality metric threshold
         "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
@@ -87,11 +86,6 @@ def main():
         columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
         print(f'Number of features is croped by {config["rules_generation_params"]["crop_features"]}')
     X_train = X_train[columns_ordered]
-    columns_number = len(columns_ordered)
-    formulas_number = 2**(2**config['rules_generation_params']['subset_size']) - 2
-    subset_number = factorial(columns_number) / factorial(columns_number - config['rules_generation_params']['subset_size'])
-    total_count = formulas_number * subset_number
-    print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_count}')
     print(f'Top 5 important features: {columns_ordered[:5]}')
     config['rules_generation_params']['feature_importance'] = False
 
