@@ -2,14 +2,17 @@ import pandas as pd
 from itertools import product, combinations
 import os.path
 import copy
+from math import factorial
 
 from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
 
 
-def get_importance_order(best_1_variable_models):
+def get_importance_order(best_1_variable_models, columns_number):
     columns_set = set()
     columns_ordered = []
+    if len(best_1_variable_models) != columns_number * 2:
+        print('Something went WRONG with feature importance: number of models in best_models is not columns_number * 2')
     for i in range(len(best_1_variable_models)):
         column_name = best_1_variable_models[i]['columns'][0]
         if column_name[0] == '~':
@@ -17,6 +20,8 @@ def get_importance_order(best_1_variable_models):
         if column_name not in columns_set:
             columns_set.add(column_name)
             columns_ordered.append(column_name)
+    if len(columns_ordered) != columns_number:
+        print('Something went WRONG with feature importance: len(columns_ordered) != columns_number')
     return columns_ordered
 
 
@@ -60,8 +65,10 @@ def create_feature_importance_config(main_config, columns_number):
     config_1_variable = copy.deepcopy(main_config)
     config_1_variable['rules_generation_params']['subset_size'] = 1
     config_1_variable['rules_generation_params']['process_number'] = 2
-    config_1_variable['rules_generation_params']['formula_per_worker'] = 1
+    subset_number = factorial(columns_number) / factorial(columns_number - config_1_variable['rules_generation_params']['subset_size'])
+    config_1_variable['rules_generation_params']['batch_size'] = int(subset_number // 2) + 1
     config_1_variable['rules_generation_params']['crop_number'] = columns_number * 2
+    config_1_variable['rules_generation_params']['crop_number_in_workers'] = None
     config_1_variable['rules_generation_params']['feature_importance'] = True
     config_1_variable['similarity_filtering_params']['sim_metric'] = 'PARENT'
     config_1_variable['similarity_filtering_params']['min_same_parents'] = 2
@@ -185,7 +192,7 @@ def log_exec(file_name, sim_metric, subset_size, rows_num, cols_num, elapsed_tim
         log = pd.read_excel('./Output/log.xlsx')
         search_idx = log.loc[(log['dataset'] == file_name) & (log['sim_metric'] == sim_metric) & \
             (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
-            (log['process_number'] == process_number) & (log['formula_per_worker'] == batch_size)].index.tolist()
+            (log['process_number'] == process_number) & (log['batch_size'] == batch_size)].index.tolist()
         if len(search_idx) == 1:
             log.loc[search_idx, ['elapsed_time']] = elapsed_time
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
@@ -193,12 +200,12 @@ def log_exec(file_name, sim_metric, subset_size, rows_num, cols_num, elapsed_tim
         else:
             new_row = pd.DataFrame(data={'dataset': [file_name], 'sim_metric': [sim_metric], \
                 'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], \
-                'process_number': [process_number], 'formula_per_worker': [batch_size]})
+                'process_number': [process_number], 'batch_size': [batch_size]})
             log = pd.concat([log, new_row], ignore_index=True)
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
     else:
         log = pd.DataFrame(data={'dataset': [file_name], 'sim_metric': [sim_metric], \
-            'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'formula_per_worker': [batch_size]})
+            'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'batch_size': [batch_size]})
         with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))

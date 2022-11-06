@@ -108,15 +108,17 @@ def compare_model_similarity(model_dict1, model_dict2, metric, min_jac_score=0.9
     return res
 
 
+def count_operators(s):
+    return s.count('|') + s.count('&') + s.count('sum')
+def count_vars(s):
+    list_of_vars = re.subn(r'\)>=[0-9]+', '', s)[0].replace('~','').replace('|',',').replace('&',',').replace('sum(','').split(',')
+    value_dict = dict((x,list_of_vars.count(x)) for x in set(list_of_vars))
+    return max(value_dict.values())
+
+
 # Compute metrics of formula's complexity (number of binary operations and maximal frequency of variable's occurance)
 # @log_sparse
 def compute_complexity_metrics(df):
-    def count_operators(s):
-        return s.count('|') + s.count('&') + s.count('sum')
-    def count_vars(s):
-        list_of_vars = re.subn(r'\)>=[0-9]+', '', s)[0].replace('~','').replace('|',',').replace('&',',').replace('sum(','').split(',')
-        value_dict = dict((x,list_of_vars.count(x)) for x in set(list_of_vars))
-        return max(value_dict.values())
     # df['number_of_binary_operators'] = df['simple_formula'].apply(count_operators)
     df['number_of_binary_operators'] = df.apply(lambda x: count_operators(x['summed_expr']) if x['summed_expr'] is not None else count_operators(x['simple_formula']), axis=1)
     # df['max_freq_of_variables'] = df['simple_formula'].apply(count_vars)

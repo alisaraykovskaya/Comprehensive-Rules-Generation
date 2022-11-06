@@ -11,7 +11,7 @@ def change_column_name(string):
   string = re.sub('\W+','', string.replace(' ','_'))
   return string
 
-def LoadData(project_name, pkl_reload=False):
+def LoadData(project_name, load_from_pkl=False):
     
     if project_name == "DivideBy30":
       df_name = "DivideBy30"
@@ -53,15 +53,17 @@ def LoadData(project_name, pkl_reload=False):
       target_name = "HeartDisease"
       file_ext = "csv" 
 
+    elif project_name == "ApptsAnon":
+      df_name = "Missed_Pedi_Appts_v4.Anon"
+      target_name = "Missed"
+      file_ext = "xlsx" 
+
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       
 
     PklFile = f'./Data/{df_name}.pkl'
     df_path = f'./Data/{df_name}.{file_ext}'
-    
-    if not path.exists(PklFile):
-        pkl_reload = True
         
     if file_ext == 'xlsx':
       df = pd.read_excel(df_path, na_values='?', keep_default_na=True)
@@ -150,8 +152,5 @@ def LoadData(project_name, pkl_reload=False):
 
     # Change column names
     df.columns = list(map(change_column_name,df.columns))
-    
-    if pkl_reload:
-        df.to_pickle(PklFile)
     
     return df
