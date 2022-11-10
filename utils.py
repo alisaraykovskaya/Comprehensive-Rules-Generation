@@ -3,6 +3,7 @@ from itertools import product, combinations
 import os.path
 import copy
 from math import factorial
+import operator 
 
 from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
@@ -47,18 +48,35 @@ def tupleList_to_df(best_formulas):
 
 
 # Generator of boolean formulas in str format using truth tables
+#def model_string_gen(vars_num):
+#    inputs = list(product([False, True], repeat=vars_num))
+#    for output in product([False, True], repeat=len(inputs)):
+#        terms = []
+#        for j in range(len(output)):
+#            if output[j]:
+#                terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
+#        if not terms:
+#            terms = ['False']
+#            continue
+#        expr = ' | '.join(terms)
+#        yield expr
+
 def model_string_gen(vars_num):
     inputs = list(product([False, True], repeat=vars_num))
+    list_of_outputs = []
+    #print(inputs)
     for output in product([False, True], repeat=len(inputs)):
-        terms = []
-        for j in range(len(output)):
-            if output[j]:
-                terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
-        if not terms:
-            terms = ['False']
-            continue
-        expr = ' | '.join(terms)
-        yield expr
+        if tuple(map(operator.not_, output)) not in list_of_outputs:
+            list_of_outputs.append(output)
+            terms = []
+            for j in range(len(output)):
+                if output[j]:
+                    terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
+            if not terms:
+                terms = ['False']
+                continue
+            expr = ' | '.join(terms)
+            yield expr
 
 
 def create_feature_importance_config(main_config, columns_number):
