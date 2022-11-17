@@ -16,7 +16,7 @@ import random
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30RemainderNoiseNull", 
+        "project_name": "DivideBy30Remainder", 
         "load_from_pkl": True 
     },
 

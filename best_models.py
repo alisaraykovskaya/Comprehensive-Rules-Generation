@@ -16,6 +16,7 @@ from multiprocessing.sharedctypes import Value
 from utils import model_string_gen, simplify_expr, add_readable_simple_formulas, find_sum, sums_generator
 from utils import tupleList_to_df, beautify_simple, beautify_summed, similarity_filtering
 from metrics_utils import count_confusion_matrix, get_parent_set, count_operators, count_vars, count_actual_subset_size
+from metrics_utils import calculate_metrics_for, negate_model
 
 
 def worker_init(df_dict_tmp, y_true_tmp, all_formulas_tmp, columns_ordered_tmp, subset_size_tmp, quality_metric_tmp, sim_metric_tmp, \
@@ -95,13 +96,15 @@ def worker(start_idx, end_idx, min_quality):
             result = apply_nan_mask_list(result, nan_mask)
 
             tp, fp, fn, tn = count_confusion_matrix(y_true, result)
+            precision, recall, f1, rocauc, accuracy = calculate_metrics_for(tp, fp, fn, tn)
 
-            precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
-            recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
-            f1 = 0 if (precision + recall) == 0 else 2 * (precision * recall) / (precision + recall)
-            fpr = 0 if (fp + tn) == 0 else fp / (fp + tn)
-            rocauc = (1 + recall - fpr) / 2
-            accuracy = 0 if (tp + fp + fn + tn) == 0 else (tp + tn) / (tp + fp + fn + tn)
+
+            # precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
+            # recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
+            # f1 = 0 if (precision + recall) == 0 else 2 * (precision * recall) / (precision + recall)
+            # fpr = 0 if (fp + tn) == 0 else fp / (fp + tn)
+            # rocauc = (1 + recall - fpr) / 2
+            # accuracy = 0 if (tp + fp + fn + tn) == 0 else (tp + tn) / (tp + fp + fn + tn)
             if quality_metric == 'f1_1':
                 quality = f1
             elif quality_metric == 'precision_1':
@@ -124,13 +127,46 @@ def worker(start_idx, end_idx, min_quality):
                     simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
                 model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
                     'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/y_true.shape[0], \
-                    'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'simple_formula': simple_formula, 'columns_set': columns_set, \
+                    'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'False',  'simple_formula': simple_formula, 'columns_set': columns_set, \
                     'number_of_binary_operators': formula_dict['number_of_binary_operators'], 'max_freq_of_variables': formula_dict['max_freq_of_variables']}
                 if sim_metric == 'JAC_SCORE':
                     model_info['result'] = result
                 else:
                     model_info['result'] = None
                 best_models.append(model_info)
+            result_neg = negate_model(result)
+            tp, fp, fn, tn = count_confusion_matrix(y_true, result_neg)
+            precision, recall, f1, rocauc, accuracy = calculate_metrics_for(tp, fp, fn, tn)
+            if quality_metric == 'f1_1':
+                quality = f1
+            elif quality_metric == 'precision_1':
+                quality = precision
+            elif quality_metric == 'recall_1':
+                quality = recall
+            elif quality_metric == 'rocauc':
+                quality = rocauc
+            elif quality_metric == 'accuracy':
+                quality = accuracy
+            if quality > min_quality:
+                precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
+                recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
+                f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
+                columns_set = get_parent_set(columns)
+                elapsed_time = time.time() - start_time
+                simple_formula = expr
+                for i in range(subset_size):
+                    simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
+                simple_formula = '~(' + simple_formula + ')'
+                model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
+                    'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/y_true.shape[0], \
+                    'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'True', 'simple_formula': simple_formula, 'columns_set': columns_set, \
+                    'number_of_binary_operators': formula_dict['number_of_binary_operators'], 'max_freq_of_variables': formula_dict['max_freq_of_variables']}
+                if sim_metric == 'JAC_SCORE':
+                    model_info['result'] = result
+                else:
+                    model_info['result'] = None
+                best_models.append(model_info)
+
 
             if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * excessive_models_num_coef:
                 best_models.sort(key=lambda row: (row[quality_metric], -row['number_of_binary_operators']), reverse=True)
@@ -243,7 +279,7 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
                 beautify_summed(models_to_excel, subset_size, variables)
 
                 models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
-                    'elapsed_time', 'columns', 'summed_expr', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+                    'elapsed_time', 'columns', 'summed_expr', 'is_negated', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
                 models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
                 if excel_exist:

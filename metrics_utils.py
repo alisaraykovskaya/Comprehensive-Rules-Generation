@@ -37,6 +37,23 @@ def count_confusion_matrix(y_true, y_pred):
     return tp, fp, fn, tn
 
 
+def calculate_metrics_for(tp, fp, fn, tn):
+    precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
+    recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
+    f1 = 0 if (precision + recall) == 0 else 2 * (precision * recall) / (precision + recall)
+    fpr = 0 if (fp + tn) == 0 else fp / (fp + tn)
+    rocauc = (1 + recall - fpr) / 2
+    accuracy = 0 if (tp + fp + fn + tn) == 0 else (tp + tn) / (tp + fp + fn + tn)
+    return precision, recall, f1, rocauc, accuracy
+
+
+@vectorize
+def negate_model(pred_item):
+    if np.isnan(pred_item):
+        return np.nan
+    return not pred_item
+
+
 @vectorize
 def generate_intersection(x, y):
     """
