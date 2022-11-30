@@ -1,4 +1,6 @@
 
 *.pyc
-Output/exec_log.txt
 Output/*.xlsx
+formulas*
+*.html
+test.py

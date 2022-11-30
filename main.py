@@ -23,13 +23,14 @@ config = {
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 3,
-        "process_number": 'default', # int or "default" = 90% of cpu
+        "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
         "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_number": 1000, # number of best models to compute quality metric threshold
         "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
         "excessive_models_num_coef": 3, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
-        "filter_similar_between_reloads": True # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
+        "filter_similar_between_reloads": True, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
+        "dataset_frac": 1,
     },
   
     "similarity_filtering_params": {
@@ -69,6 +70,9 @@ def main():
     else:
         print('Data was loaded from pickle')
         df = pd.read_pickle(f'./Data/{config["load_data_params"]["project_name"]}_binarized.pkl')
+
+    if config['rules_generation_params']['dataset_frac'] != 1:
+        df, _ = train_test_split(df, train_size=config['rules_generation_params']['dataset_frac'], stratify=df['Target'], random_state=12)
     
     y_true = df['Target']
     df.drop('Target', axis=1, inplace=True)
@@ -94,9 +98,8 @@ def main():
     find_best_models(X_train, y_train, columns_ordered, file_name=config["load_data_params"]["project_name"],\
                     **config["similarity_filtering_params"],  **config['rules_generation_params'])    
     elapsed_time = time() - start_time
-    log_exec(config["load_data_params"]["project_name"], config["similarity_filtering_params"]["sim_metric"], \
-            config["rules_generation_params"]["subset_size"], X_train.shape[0], X_train.shape[1], elapsed_time, \
-            config["rules_generation_params"]["process_number"], config['rules_generation_params']["batch_size"])
+    log_exec(config["load_data_params"]["project_name"], X_train.shape[0], X_train.shape[1], elapsed_time, \
+            **config["similarity_filtering_params"],  **config['rules_generation_params'])
 
 if __name__=='__main__':
     main()

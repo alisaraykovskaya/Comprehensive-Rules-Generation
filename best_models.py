@@ -178,7 +178,7 @@ def worker(start_idx, end_idx, min_quality):
 
 def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, sim_metric, min_jac_score, min_same_parents=1, process_number=10,\
                         crop_number=None, crop_number_in_workers=1000, excessive_models_num_coef=3, batch_size=10000, \
-                        filter_similar_between_reloads=True, file_name='tmp', crop_features=None, feature_importance=False):
+                        filter_similar_between_reloads=True, file_name='tmp', crop_features=None, feature_importance=False, dataset_frac=None):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True

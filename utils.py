@@ -205,25 +205,27 @@ def beautify_summed(df, subset_size, variables):
         df['summed_expr'] = df.apply(lambda x: x['summed_expr'].replace(f' {variables[i]} ', x['columns'][i]) if x['summed_expr'] is not None else None, axis=1)
 
 
-def log_exec(file_name, sim_metric, subset_size, rows_num, cols_num, elapsed_time, process_number, batch_size):
+def log_exec(file_name, rows_num, cols_num, elapsed_time, sim_metric, min_jac_score, min_same_parents, quality_metric, subset_size, \
+            process_number, batch_size, crop_features, crop_number, crop_number_in_workers, excessive_models_num_coef, \
+            filter_similar_between_reloads, dataset_frac, feature_importance):
     if os.path.exists("./Output/log.xlsx"):
         log = pd.read_excel('./Output/log.xlsx')
         search_idx = log.loc[(log['dataset'] == file_name) & (log['sim_metric'] == sim_metric) & \
             (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
-            (log['process_number'] == process_number) & (log['batch_size'] == batch_size)].index.tolist()
+            (log['process_number'] == process_number) & (log['batch_size'] == batch_size) & \
+            (log['dataset_frac'] == dataset_frac)].index.tolist()
         if len(search_idx) == 1:
             log.loc[search_idx, ['elapsed_time']] = elapsed_time
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
         else:
-            new_row = pd.DataFrame(data={'dataset': [file_name], 'sim_metric': [sim_metric], \
-                'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], \
-                'process_number': [process_number], 'batch_size': [batch_size]})
+            new_row = pd.DataFrame(data={'dataset': [file_name], 'dataset_frac': [dataset_frac], 'rows_num': [rows_num], 'cols_num': [cols_num], 'sim_metric': [sim_metric], \
+                'subset_size': [subset_size], 'batch_size': [batch_size], 'process_number': [process_number], 'elapsed_time': [elapsed_time]})
             log = pd.concat([log, new_row], ignore_index=True)
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
     else:
-        log = pd.DataFrame(data={'dataset': [file_name], 'sim_metric': [sim_metric], \
-            'subset_size': [subset_size], 'rows_num': [rows_num], 'cols_num': [cols_num], 'elapsed_time': [elapsed_time], 'process_number': [process_number], 'batch_size': [batch_size]})
+        log = pd.DataFrame(data={'dataset': [file_name], 'dataset_frac': [dataset_frac], 'rows_num': [rows_num], 'cols_num': [cols_num], 'sim_metric': [sim_metric], \
+             'subset_size': [subset_size], 'batch_size': [batch_size], 'process_number': [process_number], 'elapsed_time': [elapsed_time]})
         with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
