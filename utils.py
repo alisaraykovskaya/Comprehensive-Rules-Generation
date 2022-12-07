@@ -25,6 +25,29 @@ def get_importance_order(best_1_variable_models, columns_number):
         print('Something went WRONG with feature importance: len(columns_ordered) != columns_number')
     return columns_ordered
 
+# P.S. Считать фича импотанс считать до фильтровки моделей. Эта функция возвращает упорядоченный датафрейм с важностью, 
+# чтобы получить поселодовательность, надо взять list(importances_df.index)
+def get_feature_importance(best_models, subset_size):
+    feature_scores = {}
+    for i in range(len(best_models)):
+        for col in best_models[i]['columns']:
+            if col not in feature_scores.keys():
+                feature_scores[col] = 1
+            else:
+                feature_scores[col] += 1
+    sorted_importance_dict = {k: v for k, v in sorted(feature_scores.items(), key=lambda item: item[1], reverse=True)}
+    importances_df = pd.DataFrame.from_dict(sorted_importance_dict, orient='index', columns = ['importance'])
+    importances_df.to_pickle(f'./FeatureImportances/{config["load_data_params"]["project_name"]}_subset_size_{subset_size}.pkl')
+    return importances_df
+
+# In case if the number of features reduces with increase of subset_size, 
+# just add features from the old list to the end of the new list
+# нужно запускать если subset_size > 1
+def add_missing_features(sorted_features_old, sorted_features_new):
+    difference = set(sorted_features1) - set(sorted_features2)
+    for item in difference:
+        sorted_features2.append(item)
+
 
 # @log_sparse
 def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
