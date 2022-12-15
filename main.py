@@ -1,7 +1,7 @@
 from loadData import LoadData
 from binarizer import binarize_df
 from best_models import find_best_models
-from utils import log_exec, get_importance_order, create_feature_importance_config
+from utils import log_exec, get_1var_importance_order, get_1var_importance_config, get_feature_importance, add_missing_features
 
 from sklearn.model_selection import train_test_split
 from multiprocessing import freeze_support, cpu_count
@@ -23,14 +23,20 @@ config = {
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 3,
+
         "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
-        "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "filter_similar_between_reloads": True, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
+        
         "crop_number": 1000, # number of best models to compute quality metric threshold
         "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
         "excessive_models_num_coef": 3, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
-        "filter_similar_between_reloads": True, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
+        
         "dataset_frac": 1,
+        "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+
+        "incremental_run": True,
+        "crop_features_after_size": 2,
     },
   
     "similarity_filtering_params": {
@@ -55,6 +61,8 @@ def main():
         freeze_support()
     if not path.exists('Output'):
         mkdir('Output')
+    if not path.exists('FeatureImportances'):
+        mkdir('FeatureImportances')
     if config["rules_generation_params"]["process_number"]=='default':
         config["rules_generation_params"]["process_number"] = int(max(cpu_count()*.9, 1))
 
@@ -81,25 +89,47 @@ def main():
     columns_number = len(df_columns)
     print(f'project_name: {config["load_data_params"]["project_name"]}  columns_number: {columns_number}  observations_number: {X_train.shape[0]}')
 
-    print('\nDETERMINING FEATURE IMPORTANCES...')
-    config_1_variable = create_feature_importance_config(config, columns_number)
+    print('\nRUNNING ON subset_size=1 TO DETERMINE INITIAL FEATURE IMPORTANCES')
+    config_1_variable = get_1var_importance_config(config, columns_number)
+    start_time = time()
     best_1_variable = find_best_models(X_train, y_train, df_columns, file_name=config_1_variable["load_data_params"]["project_name"], \
                                         **config_1_variable["similarity_filtering_params"],  **config_1_variable["rules_generation_params"])
-    columns_ordered = get_importance_order(best_1_variable, columns_number)
-    if config["rules_generation_params"]["crop_features"] != -1:
-        columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
-        print(f'Number of features is croped by {config["rules_generation_params"]["crop_features"]}')
-    X_train = X_train[columns_ordered]
-    print(f'Top 5 important features: {columns_ordered[:5]}')
-    config['rules_generation_params']['feature_importance'] = False
-
-    print('\nBEGIN TRAINING...')
-    start_time = time()
-    find_best_models(X_train, y_train, columns_ordered, file_name=config["load_data_params"]["project_name"],\
-                    **config["similarity_filtering_params"],  **config['rules_generation_params'])    
     elapsed_time = time() - start_time
-    log_exec(config["load_data_params"]["project_name"], X_train.shape[0], X_train.shape[1], elapsed_time, \
-            **config["similarity_filtering_params"],  **config['rules_generation_params'])
+    log_exec(config_1_variable["load_data_params"]["project_name"], X_train.shape[0], X_train.shape[1], elapsed_time, \
+            **config_1_variable["similarity_filtering_params"],  **config_1_variable['rules_generation_params'])
+    columns_ordered = get_1var_importance_order(best_1_variable, config["rules_generation_params"]["subset_size"], columns_number)
+    if config["rules_generation_params"]["crop_features"] != -1 and (config["rules_generation_params"]["incremental_run"] and config["rules_generation_params"]["crop_features_after_size"] == 1 or not config["rules_generation_params"]["incremental_run"]):
+        columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
+        print(f'\nNumber of features is croped by {config["rules_generation_params"]["crop_features"]}')
+    X_train = X_train[columns_ordered]
+    print(f'\nTop 5 important features: {columns_ordered[:5]}')
+
+    if not config["rules_generation_params"]["incremental_run"]:
+        print('\nBEGIN TRAINING...')
+        start_time = time()
+        find_best_models(X_train, y_train, columns_ordered, file_name=config["load_data_params"]["project_name"],\
+                        **config["similarity_filtering_params"],  **config['rules_generation_params'])    
+        elapsed_time = time() - start_time
+        log_exec(config["load_data_params"]["project_name"], X_train.shape[0], X_train.shape[1], elapsed_time, \
+                **config["similarity_filtering_params"],  **config['rules_generation_params'])
+    else:
+        main_subset_size = config["rules_generation_params"]["subset_size"]
+        for i in range(2, main_subset_size + 1):
+            print(f'\nBEGIN TRAINING FOR subset_size={i}...')
+            config["rules_generation_params"]["subset_size"] = i
+            start_time = time()
+            best_models = find_best_models(X_train, y_train, columns_ordered, file_name=config["load_data_params"]["project_name"],\
+                            **config["similarity_filtering_params"],  **config['rules_generation_params'])    
+            elapsed_time = time() - start_time
+            log_exec(config["load_data_params"]["project_name"], X_train.shape[0], X_train.shape[1], elapsed_time, \
+                    **config["similarity_filtering_params"],  **config['rules_generation_params'])
+            columns_ordered_new = get_feature_importance(best_models, config["rules_generation_params"]["subset_size"], config["load_data_params"]["project_name"])
+            columns_ordered_new = list(columns_ordered_new.index)
+            columns_ordered = add_missing_features(columns_ordered, columns_ordered_new)
+            if config["rules_generation_params"]["crop_features"] != -1 and config["rules_generation_params"]["crop_features_after_size"] == i:
+                columns_ordered = columns_ordered[:config["rules_generation_params"]["crop_features"]]
+                print(f'\nNumber of features is croped by {config["rules_generation_params"]["crop_features"]}')
+            X_train = X_train[columns_ordered]
 
 if __name__=='__main__':
     main()

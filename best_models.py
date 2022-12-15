@@ -2,6 +2,7 @@ import os.path
 from itertools import combinations, chain, islice
 import time
 from math import factorial
+from copy import deepcopy
 
 import pandas as pd
 import numpy as np
@@ -14,7 +15,7 @@ from multiprocessing.sharedctypes import Value
 #from multiprocess.sharedctypes import Value
 
 from utils import model_string_gen, simplify_expr, add_readable_simple_formulas, find_sum, sums_generator
-from utils import tupleList_to_df, beautify_simple, beautify_summed, similarity_filtering
+from utils import list_to_df, beautify_simple, beautify_summed, similarity_filtering, post_simplify
 from metrics_utils import count_confusion_matrix, get_parent_set, count_operators, count_vars, count_actual_subset_size
 from metrics_utils import calculate_metrics_for, negate_model
 
@@ -156,6 +157,7 @@ def worker(start_idx, end_idx, min_quality):
                 simple_formula = expr
                 for i in range(subset_size):
                     simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
+                expr = '~(' + expr + ')'
                 simple_formula = '~(' + simple_formula + ')'
                 model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
                     'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/y_true.shape[0], \
@@ -178,7 +180,8 @@ def worker(start_idx, end_idx, min_quality):
 
 def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, sim_metric, min_jac_score, min_same_parents=1, process_number=10,\
                         crop_number=None, crop_number_in_workers=1000, excessive_models_num_coef=3, batch_size=10000, \
-                        filter_similar_between_reloads=True, file_name='tmp', crop_features=None, feature_importance=False, dataset_frac=None):
+                        filter_similar_between_reloads=True, file_name='tmp', crop_features=None, dataset_frac=None, incremental_run=False, \
+                        crop_features_after_size=1):
     excel_exist = False
     if os.path.exists(f"./Output/BestModels_{file_name}.xlsx"):
         excel_exist = True
@@ -233,8 +236,7 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
         })
     formulas_number = len(all_formulas)
     total_model_count = formulas_number * subset_number
-    if not feature_importance:
-        print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_model_count}')
+    print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_model_count}')
 
     worker_timer = time.time()
     pool = Pool(process_number, initializer=worker_init, initargs=(df_dict, y_true, all_formulas, columns_ordered, subset_size, quality_metric, \
@@ -243,6 +245,7 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
 
     start_time = time.time()
     best_models = []
+    best_models_not_filtered = []
     min_quality = -1
     current_model_count = 0
     batch = []
@@ -266,38 +269,39 @@ def find_best_models(df, y_true, columns_ordered, subset_size, quality_metric, s
             if crop_number is not None or last_reload:
                 best_models.sort(key=lambda row: (row[quality_metric], -row['number_of_binary_operators']), reverse=True)
             if filter_similar_between_reloads or last_reload:
+                best_models_not_filtered = deepcopy(best_models)
                 best_models = similarity_filtering(best_models, sim_metric, min_jac_score, min_same_parents)
             if crop_number is not None and not last_reload:
                 best_models = best_models[:crop_number+1]
             min_quality = best_models[-1][quality_metric]
             # print('sorted & filtered models')
 
-            if not feature_importance:
-                models_to_excel = tupleList_to_df(best_models)
-                models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
-                beautify_simple(models_to_excel)
-                beautify_summed(models_to_excel, subset_size, variables)
+            models_to_excel = list_to_df(best_models)
+            models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
+            # models_to_excel = post_simplify(models_to_excel, subset_size, variables, algebra)
+            models_to_excel['simple_formula'] = models_to_excel.apply(lambda x: post_simplify(x, subset_size, variables, algebra), axis=1)
+            beautify_simple(models_to_excel)
+            beautify_summed(models_to_excel, subset_size, variables)
 
-                models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
-                    'elapsed_time', 'columns', 'summed_expr', 'is_negated', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
-                models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
+            models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
+                'elapsed_time', 'columns', 'summed_expr', 'is_negated', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+            models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
-                if excel_exist:
-                    with pd.ExcelWriter(f"./Output/BestModels_{file_name}.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
-                        models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
-                else:
-                    models_to_excel.to_excel(f"./Output/BestModels_{file_name}.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
-                    excel_exist = True
+            if excel_exist:
+                with pd.ExcelWriter(f"./Output/BestModels_{file_name}.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+                    models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
+            else:
+                models_to_excel.to_excel(f"./Output/BestModels_{file_name}.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
+                excel_exist = True
 
-                # print('wrote models to excel')
+            # print('wrote models to excel')
             
             batch = []
             elapsed_time = time.time() - start_time
             elapsed_time_per_model = elapsed_time/current_model_count
-            if not feature_importance:
-                print(f'processed_models: {current_model_count/total_model_count * 100:.1f}%  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(total_model_count - current_model_count) * elapsed_time_per_model:.2f}')
+            print(f'processed_models: {current_model_count/total_model_count * 100:.1f}%  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(total_model_count - current_model_count) * elapsed_time_per_model:.2f}')
     worker_timer = time.time()
     pool.close()
     pool.join()
     print(f'number of workers terminated: {process_number}  time to terminate: {time.time() - worker_timer}')
-    return best_models
+    return best_models_not_filtered

@@ -9,25 +9,22 @@ from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
 
 
-def get_importance_order(best_1_variable_models, columns_number):
+def get_1var_importance_order(best_models, subset_size, columns_number):
     columns_set = set()
     columns_ordered = []
-    if len(best_1_variable_models) != columns_number * 2:
-        print('Something went WRONG with feature importance: number of models in best_models is not columns_number * 2')
-    for i in range(len(best_1_variable_models)):
-        column_name = best_1_variable_models[i]['columns'][0]
-        if column_name[0] == '~':
-            column_name = column_name[1:]
-        if column_name not in columns_set:
-            columns_set.add(column_name)
-            columns_ordered.append(column_name)
-    if len(columns_ordered) != columns_number:
+    for i in range(len(best_models)):
+        column_names = best_models[i]['columns']
+        for column_name in column_names:
+            if column_name not in columns_set:
+                columns_set.add(column_name)
+                columns_ordered.append(column_name)
+    if subset_size == 1 and len(columns_ordered) != columns_number:
         print('Something went WRONG with feature importance: len(columns_ordered) != columns_number')
     return columns_ordered
 
 # P.S. Считать фича импотанс считать до фильтровки моделей. Эта функция возвращает упорядоченный датафрейм с важностью, 
 # чтобы получить поселодовательность, надо взять list(importances_df.index)
-def get_feature_importance(best_models, subset_size):
+def get_feature_importance(best_models, subset_size, project_name):
     feature_scores = {}
     for i in range(len(best_models)):
         for col in best_models[i]['columns']:
@@ -37,16 +34,17 @@ def get_feature_importance(best_models, subset_size):
                 feature_scores[col] += 1
     sorted_importance_dict = {k: v for k, v in sorted(feature_scores.items(), key=lambda item: item[1], reverse=True)}
     importances_df = pd.DataFrame.from_dict(sorted_importance_dict, orient='index', columns = ['importance'])
-    importances_df.to_pickle(f'./FeatureImportances/{config["load_data_params"]["project_name"]}_subset_size_{subset_size}.pkl')
+    importances_df.to_pickle(f'./FeatureImportances/{project_name}_subset_size_{subset_size}.pkl')
     return importances_df
 
 # In case if the number of features reduces with increase of subset_size, 
 # just add features from the old list to the end of the new list
 # нужно запускать если subset_size > 1
 def add_missing_features(sorted_features_old, sorted_features_new):
-    difference = set(sorted_features1) - set(sorted_features2)
+    difference = set(sorted_features_old) - set(sorted_features_new)
     for item in difference:
-        sorted_features2.append(item)
+        sorted_features_new.append(item)
+    return sorted_features_new
 
 
 # @log_sparse
@@ -65,7 +63,7 @@ def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
 
 # List of tuples (best_models) to dataframe
 # @log_sparse
-def tupleList_to_df(best_formulas):
+def list_to_df(best_formulas):
     models = pd.DataFrame.from_records(best_formulas)
     return models
 
@@ -102,15 +100,14 @@ def model_string_gen(vars_num):
             yield expr
 
 
-def create_feature_importance_config(main_config, columns_number):
+def get_1var_importance_config(main_config, columns_number):
     config_1_variable = copy.deepcopy(main_config)
     config_1_variable['rules_generation_params']['subset_size'] = 1
-    config_1_variable['rules_generation_params']['process_number'] = 2
+    config_1_variable['rules_generation_params']['process_number'] = min(2, main_config['rules_generation_params']['process_number'])
     subset_number = factorial(columns_number) / factorial(columns_number - config_1_variable['rules_generation_params']['subset_size'])
     config_1_variable['rules_generation_params']['batch_size'] = int(subset_number // 2) + 1
     config_1_variable['rules_generation_params']['crop_number'] = columns_number * 2
     config_1_variable['rules_generation_params']['crop_number_in_workers'] = None
-    config_1_variable['rules_generation_params']['feature_importance'] = True
     config_1_variable['similarity_filtering_params']['sim_metric'] = 'PARENT'
     config_1_variable['similarity_filtering_params']['min_same_parents'] = 2
     
@@ -211,6 +208,18 @@ def add_readable_simple_formulas(best_models, subset_size):
     return best_models
 
 
+def post_simplify(row, subset_size, variables, algebra):
+    if row['is_negated']:
+        simple_formula = simplify_expr(row['expr'], subset_size, variables, algebra)
+        for i in range(subset_size):
+            simple_formula = simple_formula.replace(variables[i], f'col{i}')
+        for i in range(subset_size):
+            simple_formula = simple_formula.replace(f'col{i}', row['columns'][i])
+        return simple_formula
+    else:
+        return row['simple_formula']
+
+
 # @log_sparse
 def beautify_simple(df):
     df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('~', ' ~'), axis=1)
@@ -230,7 +239,7 @@ def beautify_summed(df, subset_size, variables):
 
 def log_exec(file_name, rows_num, cols_num, elapsed_time, sim_metric, min_jac_score, min_same_parents, quality_metric, subset_size, \
             process_number, batch_size, crop_features, crop_number, crop_number_in_workers, excessive_models_num_coef, \
-            filter_similar_between_reloads, dataset_frac, feature_importance):
+            filter_similar_between_reloads, dataset_frac, incremental_run, crop_features_after_size):
     if os.path.exists("./Output/log.xlsx"):
         log = pd.read_excel('./Output/log.xlsx')
         search_idx = log.loc[(log['dataset'] == file_name) & (log['sim_metric'] == sim_metric) & \
