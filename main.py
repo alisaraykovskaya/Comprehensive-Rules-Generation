@@ -1,4 +1,4 @@
-from loadData import LoadData
+from loadData import LoadData, change_column_name
 from binarizer import binarize_df
 from best_models import find_best_models
 from utils import log_exec, get_1var_importance_order, get_1var_importance_config, get_feature_importance, add_missing_features
@@ -22,20 +22,20 @@ config = {
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 3,
+        "subset_size": 2,
 
         "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
         "filter_similar_between_reloads": True, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
         
-        "crop_number": 1000, # number of best models to compute quality metric threshold
-        "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
+        "crop_number": 2000, # number of best models to compute quality metric threshold
+        "crop_number_in_workers": 2000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
         "excessive_models_num_coef": 3, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
         
         "dataset_frac": 1,
-        "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_features": 1000, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
 
-        "incremental_run": True,
+        "incremental_run": False,
         "crop_features_after_size": 2,
     },
   
@@ -107,7 +107,7 @@ def main():
     if not config["rules_generation_params"]["incremental_run"]:
         print('\nBEGIN TRAINING...')
         start_time = time()
-        find_best_models(X_train, y_train, columns_ordered, file_name=config["load_data_params"]["project_name"],\
+        best_models = find_best_models(X_train, y_train, columns_ordered, file_name=config["load_data_params"]["project_name"],\
                         **config["similarity_filtering_params"],  **config['rules_generation_params'])    
         elapsed_time = time() - start_time
         log_exec(config["load_data_params"]["project_name"], X_train.shape[0], X_train.shape[1], elapsed_time, \
