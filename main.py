@@ -16,8 +16,8 @@ import random
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30Remainder", 
-        "load_from_pkl": True 
+        "project_name": "Titanic", 
+        "load_from_pkl": False
     },
 
     "rules_generation_params": {
@@ -49,7 +49,7 @@ config = {
         "unique_threshold": 20, # maximal number of unique values to consider numerical variable as category
         "q": 20, # number of quantiles to split numerical variable, can be lowered if there is need in speed
         "exceptions_threshold": 0.01, # max % of exeptions allowed while converting a variable into numeric to treat it as numeric 
-        "numerical_binarization": "threshold", #"range"
+        "numerical_binarization": "range", #"range"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
         "share_to_drop": 0.005, # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
         "create_nan_features": True # If true for every feature that contains nans, corresponding nan indecatore feature will be created
@@ -73,7 +73,7 @@ def main():
     if not config["load_data_params"]["load_from_pkl"]:
         df = LoadData(**config["load_data_params"])
         print('Binarizing data...')
-        df = binarize_df(df, **config["binarizer_params"])
+        df, dict_one_hot_cols, dict_strategies = binarize_df(df, **config["binarizer_params"])
         df.to_pickle(f'./Data/{config["load_data_params"]["project_name"]}_binarized.pkl')
     else:
         print('Data was loaded from pickle')
