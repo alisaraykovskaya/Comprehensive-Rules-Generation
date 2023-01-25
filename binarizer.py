@@ -226,8 +226,8 @@ def binarize_df(df, unique_threshold=20, q=20, exceptions_threshold=0.01, numeri
     # convert to boolean type
     for col in df.columns:
         df[col] = df[col].apply(boolarize)
-    print(dict_one_hot_cols)
-    print(dict_strategies)
+    #print(dict_one_hot_cols)
+    #print(dict_strategies)
     return df, dict_one_hot_cols, dict_strategies
 
 
