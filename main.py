@@ -73,7 +73,7 @@ def main():
     if not config["load_data_params"]["load_from_pkl"]:
         df = LoadData(**config["load_data_params"])
         print('Binarizing data...')
-        df, dict_one_hot_cols, dict_strategies = binarize_df(df, **config["binarizer_params"])
+        df, dict_strategies, dict_one_hot_values = binarize_df(df, **config["binarizer_params"])
         df.to_pickle(f'./Data/{config["load_data_params"]["project_name"]}_binarized.pkl')
     else:
         print('Data was loaded from pickle')
