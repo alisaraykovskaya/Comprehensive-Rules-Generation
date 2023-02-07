@@ -58,6 +58,11 @@ def LoadData(project_name, load_from_pkl=False):
       target_name = "Missed"
       file_ext = "xlsx" 
 
+    elif project_name == "dont_overfit":
+      df_name = "dont_overfit_train"
+      target_name = "target"
+      file_ext = "csv" 
+
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       

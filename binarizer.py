@@ -255,7 +255,7 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
                     one_hot = one_hot.drop(columns = [col])
                     dict_one_hot_values[column_name].remove('nan')
          
-        return one_hot
+        return one_hot, dict_strategies, dict_one_hot_values
 
 def boolarize(value):
     if value==1:
@@ -275,7 +275,7 @@ def binarize_df(df, unique_threshold=20, q=20, exceptions_threshold=0.01, numeri
     for column in df.columns:
         if column != 'Target':
             print(column)
-            binarized = binarize(df, column, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop, create_nan_features, dict_strategies, dict_one_hot_values)
+            binarized, dict_strategies, dict_one_hot_values = binarize(df, column, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop, create_nan_features, dict_strategies, dict_one_hot_values)
             if binarized is not None:
                 df = df.join(binarized)
                 df.drop(column, axis=1, inplace=True)
@@ -303,10 +303,10 @@ def binarizer_predict(test_df, column_name, dict_strategies, dict_one_hot_values
                 if col != 'nan' and col!='others':
                     name = column_name + '<=' + str(col)
                     #parsed_value = col
-                    one_hot[name] = test_df[column_name]<=col
+                    one_hot[name] = converted<=col
                 elif col=='nan':
                     name = column_name + '=nan'
-                    one_hot[name] = test_df[column_name].isna()
+                    one_hot[name] = converted.isna()
                     
 
         elif strategy=='range':
@@ -315,10 +315,11 @@ def binarizer_predict(test_df, column_name, dict_strategies, dict_one_hot_values
                     lower_bound = col[0]
                     upper_bound = col[1]
                     name = column_name + '$\in$(' + str(lower_bound) +', ' + str(upper_bound) + ']'
-                    one_hot[name] = (lower_bound<test_df[column_name]) & (test_df[column_name]<=upper_bound)
+                    # print(test_df[column_name])
+                    one_hot[name] = (lower_bound<converted) & (converted<=upper_bound)
                 elif col=='nan':
                     name = column_name + '=nan'
-                    one_hot[name] = test_df[column_name].isna()
+                    one_hot[name] = converted.isna()
 
         else:
             for col in list_of_cols:
