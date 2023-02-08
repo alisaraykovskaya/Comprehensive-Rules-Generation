@@ -6,13 +6,13 @@ from sklearn.metrics import classification_report
 
 config = {
     "load_data_params":{
-        "project_name": "heart", 
-        "load_from_pkl": True
+        "project_name": "Titanic", 
+        "load_from_pkl": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 3,
+        "subset_size": 2,
 
         "process_number": 10, # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
@@ -57,15 +57,10 @@ def main():
     crg_alg = CRG(binarizer, **config["load_data_params"], **config["rules_generation_params"], **config["similarity_filtering_params"])
 
     crg_alg.fit(X_train, y_train)
-    print('subset_size=1')
-    preds = crg_alg.predict(raw_df_test=X_test, subset_size=1, k_best=5)
-    print(classification_report(y_test, preds))
-    print('subset_size=2')
-    preds = crg_alg.predict(raw_df_test=X_test, subset_size=2, k_best=5)
-    print(classification_report(y_test, preds))
-    print('subset_size=3')
-    preds = crg_alg.predict(raw_df_test=X_test, subset_size=3, k_best=5)
-    print(classification_report(y_test, preds))
+    for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
+        print(f'subset_size={subset_size}')
+        preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
+        print(classification_report(y_test, preds))
 
 
 

@@ -150,6 +150,9 @@ class CRG:
         result = []
         
         if isinstance(k_best, int):
+            if subset_size not in self.best_models_dict:
+                print(f"The algorithm did not run for subset_size={subset_size}")
+                return None
             models = self.best_models_dict[subset_size][:k_best]
             for model_dict in models:
                 columns = model_dict['columns']
