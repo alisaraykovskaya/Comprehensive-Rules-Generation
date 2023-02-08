@@ -37,6 +37,9 @@ class CRG:
         excessive_models_num_coef=3,
         dataset_frac=1,
         crop_features=-1,
+        complexity_restr_operators=None,
+        complexity_restr_vars=None,
+        time_restriction_seconds=None,
         incremental_run=True,
         crop_features_after_size=1,
         sim_metric="PARENT",
@@ -56,6 +59,9 @@ class CRG:
         self.excessive_models_num_coef = excessive_models_num_coef
         self.dataset_frac = dataset_frac
         self.crop_features = crop_features
+        self.complexity_restr_operators=complexity_restr_operators
+        self.complexity_restr_vars=complexity_restr_vars
+        self.time_restriction_seconds = time_restriction_seconds
         self.incremental_run = incremental_run
         self.crop_features_after_size = crop_features_after_size
         self.sim_metric = sim_metric
@@ -142,7 +148,7 @@ class CRG:
 
     
     def predict(self, raw_df_test, subset_size, k_best):
-        print('BINARIZING DATA...')
+        print('BINARIZING TEST DATA...')
         df_test = self.binarizer.transform(raw_df_test)
         df_test_dict = {}
         for col in df_test.columns:
@@ -338,7 +344,11 @@ class CRG:
             if actual_subset_size < subset_size:
                 continue
             number_of_binary_operators = count_operators(simple_expr)
-            max_freq_of_variables = count_vars(simple_expr)
+            max_freq_of_variables = count_vars(simple_expr) 
+            if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
+                continue
+            if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
+                continue
 
             summed_expr = find_sum(sums_generator(subset_size), simple_expr)
 
@@ -392,6 +402,9 @@ class CRG:
                 batch.append((subset_index, subset_index+batch_size, min_quality, subset_size))
                 current_model_count += batch_size * formulas_number
             
+            if self.time_restriction_seconds is not None and (time() - start_time) > self.time_restriction_seconds:
+                last_reload = True
+            
             if len(batch) >= self.process_number or last_reload:
                 # print(batch)
                 # print('Workers time')
@@ -432,6 +445,8 @@ class CRG:
                 elapsed_time = time() - start_time
                 elapsed_time_per_model = elapsed_time/current_model_count
                 print(f'processed_models: {current_model_count/total_model_count * 100:.1f}%  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(total_model_count - current_model_count) * elapsed_time_per_model:.2f}')
+                if self.time_restriction_seconds is not None and (time() - start_time) > self.time_restriction_seconds:
+                    break
         worker_timer = time()
         pool.close()
         pool.join()
@@ -447,18 +462,68 @@ class CRG:
                 (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
                 (log['process_number'] == self.process_number) & (log['batch_size'] == self.batch_size) & \
                 (log['dataset_frac'] == self.dataset_frac)].index.tolist()
+            search_idx = log.loc[
+                (log['dataset'] == self.project_name) & \
+                (log['dataset_frac'] == self.dataset_frac) & \
+                (log['subset_size'] == subset_size) & \
+                (log['rows_num'] == rows_num) & \
+                (log['cols_num'] == cols_num) & \
+                (log['formulas_num'] == len(self.all_formulas)) & \
+                (log['batch_size'] == self.batch_size) & \
+                (log['process_number'] == self.process_number) & \
+                (log['sim_metric'] == self.sim_metric) & \
+                (log['crop_number'] == self.crop_number) & \
+                (log['crop_number_in_workers'] == self.crop_number_in_workers) & \
+                (log['excessive_models_num_coef'] == self.excessive_models_num_coef) & \
+                (log['crop_features'] == self.crop_features) & \
+                (log['complexity_restr_operators'] == self.complexity_restr_operators) & \
+                (log['complexity_restr_vars'] == self.complexity_restr_vars) & \
+                (log['time_restriction_seconds'] == self.time_restriction_seconds)\
+            ].index.tolist()
             if len(search_idx) == 1:
                 log.loc[search_idx, ['elapsed_time']] = elapsed_time
                 with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
             else:
-                new_row = pd.DataFrame(data={'dataset': [self.project_name], 'dataset_frac': [self.dataset_frac], 'rows_num': [rows_num], 'cols_num': [cols_num], 'sim_metric': [self.sim_metric], \
-                    'subset_size': [subset_size], 'batch_size': [self.batch_size], 'process_number': [self.process_number], 'elapsed_time': [elapsed_time]})
+                new_row = pd.DataFrame(data={'dataset': [self.project_name],
+                                            'dataset_frac': [self.dataset_frac],
+                                            'subset_size': [subset_size],
+                                            'rows_num': [rows_num],
+                                            'cols_num': [cols_num],
+                                            'formulas_num': [len(self.all_formulas)],
+                                            'batch_size': [self.batch_size],
+                                            'process_number': [self.process_number],    
+                                            'elapsed_time': [elapsed_time],
+                                            'sim_metric': [self.sim_metric],
+                                            'crop_number': [self.crop_number],
+                                            'crop_number_in_workers': [self.crop_number_in_workers],
+                                            'excessive_models_num_coef': [self.excessive_models_num_coef],
+                                            'crop_features': [self.crop_features],
+                                            'complexity_restr_operators': [self.complexity_restr_operators],
+                                            'complexity_restr_vars': [self.complexity_restr_vars],
+                                            'time_restriction_seconds': [self.time_restriction_seconds]
+                                            })
                 log = pd.concat([log, new_row], ignore_index=True)
                 with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
         else:
-            log = pd.DataFrame(data={'dataset': [self.project_name], 'dataset_frac': [self.dataset_frac], 'rows_num': [rows_num], 'cols_num': [cols_num], 'sim_metric': [self.sim_metric], \
-                'subset_size': [subset_size], 'batch_size': [self.batch_size], 'process_number': [self.process_number], 'elapsed_time': [elapsed_time]})
+            log = pd.DataFrame(data={'dataset': [self.project_name],
+                                     'dataset_frac': [self.dataset_frac],
+                                     'subset_size': [subset_size],
+                                     'rows_num': [rows_num],
+                                     'cols_num': [cols_num],
+                                     'formulas_num': [len(self.all_formulas)],
+                                     'batch_size': [self.batch_size],
+                                     'process_number': [self.process_number],    
+                                     'elapsed_time': [elapsed_time],
+                                     'sim_metric': [self.sim_metric],
+                                     'crop_number': [self.crop_number],
+                                     'crop_number_in_workers': [self.crop_number_in_workers],
+                                     'excessive_models_num_coef': [self.excessive_models_num_coef],
+                                     'crop_features': [self.crop_features],
+                                     'complexity_restr_operators': [self.complexity_restr_operators],
+                                     'complexity_restr_vars': [self.complexity_restr_vars],
+                                     'time_restriction_seconds': [self.time_restriction_seconds]
+                                     })
             with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))

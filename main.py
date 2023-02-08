@@ -6,15 +6,15 @@ from sklearn.metrics import classification_report
 
 config = {
     "load_data_params":{
-        "project_name": "Titanic", 
+        "project_name": "DivideBy30Remainder", 
         "load_from_pkl": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 2,
+        "subset_size": 4,
 
-        "process_number": 4, # int or "default" = 90% of cpu
+        "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
         "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
         
@@ -24,6 +24,11 @@ config = {
         
         "dataset_frac": 1,
         "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+
+        "complexity_restr_operators": 3,
+        "complexity_restr_vars": None,
+
+        "time_restriction_seconds": 300,
 
         "incremental_run": True,
         "crop_features_after_size": 1,
