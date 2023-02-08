@@ -5,7 +5,8 @@ from math import factorial
 from multiprocessing import freeze_support, cpu_count, Pool
 from itertools import combinations, chain, islice
 from copy import deepcopy
-import operator 
+import operator
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -196,6 +197,10 @@ class CRG:
 
 
     def worker(self, start_idx, end_idx, min_quality, subset_size):
+        if subset_size == 1:
+            crop_number_in_workers = self.onevar_crop_number_in_workers
+        else:
+            crop_number_in_workers = self.crop_number_in_workers
         best_models = []
         for columns in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns)
@@ -285,9 +290,9 @@ class CRG:
                     best_models.append(model_info)
 
 
-                if self.crop_number_in_workers is not None and len(best_models) >= self.crop_number_in_workers * self.excessive_models_num_coef:
+                if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * self.excessive_models_num_coef:
                     best_models.sort(key=lambda row: (row[self.quality_metric], -row['number_of_binary_operators']), reverse=True)
-                    best_models = best_models[:self.crop_number_in_workers]
+                    best_models = best_models[:crop_number_in_workers]
                     min_quality = best_models[-1][self.quality_metric]
 
         return best_models
@@ -456,12 +461,14 @@ class CRG:
 
 
     def log_exec(self, subset_size, elapsed_time, rows_num, cols_num):
+        now = datetime.now()
+        now = now.strftime("%Y-%m-%d %H:%M:%S")
         if path.exists("./Output/log.xlsx"):
             log = pd.read_excel('./Output/log.xlsx')
-            search_idx = log.loc[(log['dataset'] == self.project_name) & (log['sim_metric'] == self.sim_metric) & \
-                (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
-                (log['process_number'] == self.process_number) & (log['batch_size'] == self.batch_size) & \
-                (log['dataset_frac'] == self.dataset_frac)].index.tolist()
+            # search_idx = log.loc[(log['dataset'] == self.project_name) & (log['sim_metric'] == self.sim_metric) & \
+            #     (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
+            #     (log['process_number'] == self.process_number) & (log['batch_size'] == self.batch_size) & \
+            #     (log['dataset_frac'] == self.dataset_frac)].index.tolist()
             search_idx = log.loc[
                 (log['dataset'] == self.project_name) & \
                 (log['dataset_frac'] == self.dataset_frac) & \
@@ -475,17 +482,17 @@ class CRG:
                 (log['crop_number'] == self.crop_number) & \
                 (log['crop_number_in_workers'] == self.crop_number_in_workers) & \
                 (log['excessive_models_num_coef'] == self.excessive_models_num_coef) & \
-                (log['crop_features'] == self.crop_features) & \
-                (log['complexity_restr_operators'] == self.complexity_restr_operators) & \
-                (log['complexity_restr_vars'] == self.complexity_restr_vars) & \
-                (log['time_restriction_seconds'] == self.time_restriction_seconds)\
+                (log['crop_features'] == self.crop_features)
             ].index.tolist()
             if len(search_idx) == 1:
                 log.loc[search_idx, ['elapsed_time']] = elapsed_time
+                log.loc[search_idx, ['datetime']] = now
                 with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
             else:
-                new_row = pd.DataFrame(data={'dataset': [self.project_name],
+                new_row = pd.DataFrame(data={
+                                            'datetime': [now],
+                                            'dataset': [self.project_name],
                                             'dataset_frac': [self.dataset_frac],
                                             'subset_size': [subset_size],
                                             'rows_num': [rows_num],
@@ -507,7 +514,9 @@ class CRG:
                 with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
         else:
-            log = pd.DataFrame(data={'dataset': [self.project_name],
+            log = pd.DataFrame(data={
+                                     'datetime': [now],
+                                     'dataset': [self.project_name],
                                      'dataset_frac': [self.dataset_frac],
                                      'subset_size': [subset_size],
                                      'rows_num': [rows_num],

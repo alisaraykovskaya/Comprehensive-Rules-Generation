@@ -6,45 +6,45 @@ from sklearn.metrics import classification_report
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30Remainder", 
+        "project_name": "DivideBy30", 
         "load_from_pkl": False
     },
 
     "rules_generation_params": {
-        "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 4,
+        "quality_metric": "f1", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
+        "subset_size": 4, # number of variables for boolean formula in models
 
         "process_number": "default", # int or "default" = 90% of cpu
-        "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
-        "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
+        "batch_size": 10000, # number of subsets, which each worker will be processing on every reload. number_of_models = batch_size * formula_number
+        "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel between reloads best_models will contain similar models. May lead to not reproducible results.
         
-        "crop_number": 1000, # number of best models to compute quality metric threshold
-        "crop_number_in_workers": 1000, # same like crop_number, but within the workres. If less than crop_number, it may lead to unstable results
-        "excessive_models_num_coef": 3, # how to increase the actual crop_number in order to get an appropriate number of best models after similarity filtering (increase if the result contains too few models)
+        "crop_number": 2000, # crop number of best models after every reload
+        "crop_number_in_workers": 2000, # crop the number of best models in worker if it accumulated more than (crop_number_in_workers * excessive_models_num_coef) models. If less than crop_number, it may lead to unstable results
+        "excessive_models_num_coef": 3, # used for computing cropping threshold in workers
         
-        "dataset_frac": 1,
+        "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
         "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
 
-        "complexity_restr_operators": 3,
-        "complexity_restr_vars": None,
+        "complexity_restr_operators": 3, # Consider Boolean formulas, only with a given number of binary operators. It is worth noting that the value should not be less than subset_size-1
+        "complexity_restr_vars": None, # Consider Boolean formulas with only a given number of repetitions of one variable
 
-        "time_restriction_seconds": 300,
+        "time_restriction_seconds": 5000, # Limiting the running time of the algorithm per subset_size
 
-        "incremental_run": True,
-        "crop_features_after_size": 1,
+        "incremental_run": True, # run algorithm on subset_size=1...subset_size
+        "crop_features_after_size": 1, # if crop_features and incremental_run, then cropping will occur after subset_size
     },
   
     "similarity_filtering_params": {
-        "sim_metric": "PARENT", #"JAC_SCORE"
-        "min_jac_score": 0.9, #JAC_SCORE threshold
-        "min_same_parents": 2 #PARENT sim threshold
+        "sim_metric": "PARENT", # "JAC_SCORE"
+        "min_jac_score": 0.9, # JAC_SCORE threshold
+        "min_same_parents": 2 # PARENT sim threshold
     },
   
     "binarizer_params": {
         "unique_threshold": 20, # maximal number of unique values to consider numerical variable as category
         "q": 20, # number of quantiles to split numerical variable, can be lowered if there is need in speed
         "exceptions_threshold": 0.01, # max % of exeptions allowed while converting a variable into numeric to treat it as numeric 
-        "numerical_binarization": "range", #"range"
+        "numerical_binarization": "range", # "range"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
         "share_to_drop": 0.005, # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
         "create_nan_features": True # If true for every feature that contains nans, corresponding nan indecatore feature will be created
