@@ -6,8 +6,8 @@ from sklearn.metrics import classification_report
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30Remainder", 
-        "load_from_pkl": False
+        "project_name": "heart", 
+        "load_from_pkl": True
     },
 
     "rules_generation_params": {
@@ -57,8 +57,16 @@ def main():
     crg_alg = CRG(binarizer, **config["load_data_params"], **config["rules_generation_params"], **config["similarity_filtering_params"])
 
     crg_alg.fit(X_train, y_train)
-    preds = crg_alg.predict(X_test, 5)
+    print('subset_size=1')
+    preds = crg_alg.predict(raw_df_test=X_test, subset_size=1, k_best=5)
     print(classification_report(y_test, preds))
+    print('subset_size=2')
+    preds = crg_alg.predict(raw_df_test=X_test, subset_size=2, k_best=5)
+    print(classification_report(y_test, preds))
+    print('subset_size=3')
+    preds = crg_alg.predict(raw_df_test=X_test, subset_size=3, k_best=5)
+    print(classification_report(y_test, preds))
+
 
 
 if __name__=='__main__':

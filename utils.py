@@ -97,7 +97,19 @@ def model_string_gen(vars_num):
                 terms = ['False']
                 continue
             expr = ' | '.join(terms)
-            yield expr
+            yield expr, output
+
+
+def outputs_to_model_string(output, vars_num):
+    terms = []
+    inputs = list(product([False, True], repeat=vars_num))
+    for j in range(len(output)):
+        if output[j]:
+            terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
+    if not terms:
+        terms = ['False']
+    expr = ' | '.join(terms)
+    return expr
 
 
 def get_1var_importance_config(main_config, columns_number):
