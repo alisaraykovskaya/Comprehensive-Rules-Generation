@@ -14,7 +14,7 @@ config = {
         "quality_metric": "f1", #'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 2,
 
-        "process_number": 10, # int or "default" = 90% of cpu
+        "process_number": 4, # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload
         "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel best_models between reloads will contain similar models. May lead to not reproducible results.
         

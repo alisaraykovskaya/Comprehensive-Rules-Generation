@@ -1,7 +1,9 @@
 import pandas as pd
 import re
 import numpy as np 
+import warnings
 
+warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 #Parameters description
 
 #unique_threshold - maximal number of unique values to consider numerical variable as category
