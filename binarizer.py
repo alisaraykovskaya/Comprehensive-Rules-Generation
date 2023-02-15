@@ -112,6 +112,8 @@ def one_hot_encoding(column, column_name, numerical_binarization, share_to_drop)
 def rename_columns(string):
     if '(' in string and ']' in string:
         string = str(string.split('_(')[0]) + str('<=')+ str(string.split(', ')[1].replace(']',''))
+    elif 'inf' in string:
+        string = str(string.split('_')[0]) + str('<=') + str('inf')
     else:
         pass
     return string  
@@ -196,28 +198,24 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
 
                 if numerical_binarization=='threshold':
                     one_hot_cols = list(one_hot.columns)
-                    print(one_hot_cols)
                     if not type(one_hot_cols[-1])==float:
                         one_hot_cols[-1]=float('inf')
                     else:
                         one_hot_cols[-2]=float('inf')
                     one_hot.columns = one_hot_cols
-                    print(one_hot.columns)
                     dict_one_hot_values[column_name] = list(map(interval_right_bound, list(one_hot.columns)))
-                    #print(dict_one_hot_values[column_name])
+                    
 
                 elif numerical_binarization=='range':
                     one_hot_cols = list(one_hot.columns)
-                    print(one_hot_cols)
                     one_hot_cols[0]=(float('-inf'), one_hot.columns[0].right)
                     if not type(one_hot_cols[-1])==float:
                         one_hot_cols[-1]=(one_hot.columns[-1].left, float('inf'))
                     else:
                         one_hot_cols[-2]=(one_hot.columns[-2].left, float('inf'))
                     one_hot.columns = one_hot_cols
-                    print(one_hot.columns)
                     dict_one_hot_values[column_name] = list(map(interval_bounds, list(one_hot.columns)))
-                    #print(dict_one_hot_values[column_name])
+
 
                 try:
                     dict_one_hot_values[column_name][dict_one_hot_values[column_name].index(np.nan)]='nan'
@@ -240,15 +238,7 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
                         dict_one_hot_values[column_name].remove(col)
                     except:
                         pass
-          
-                    # if numerical_binarization=='threshold': 
-                    #     dict_one_hot_values[column_name][-1] = float('inf')
 
-                    # elif numerical_binarization=='range':
-                    #     dict_one_hot_values[column_name][0] = (float('-inf'), dict_one_hot_values[column_name][0][1])
-                    #     dict_one_hot_values[column_name][-1] = (dict_one_hot_values[column_name][-1][0],  float('inf'))
-
-                print(dict_one_hot_values[column_name])
                 
         
             #number of unique values is less than 20  -> treat as category
@@ -316,11 +306,12 @@ def binarize_df(df, unique_threshold=20, q=20, exceptions_threshold=0.01, numeri
                 df.drop(column, axis=1, inplace=True)
             else:
                 df.drop(column, axis=1, inplace=True)
+
     
     # convert to boolean type
     for col in df.columns:
         df[col] = df[col].apply(boolarize)
-    
+
     return df, dict_strategies, dict_one_hot_values
 
 
@@ -329,6 +320,7 @@ def binarizer_predict(test_df, column_name, dict_strategies, dict_one_hot_values
     one_hot = pd.DataFrame()
     strategy = dict_strategies[column_name]
     list_of_cols = dict_one_hot_values[column_name]
+
 
     if strategy=='threshold' or strategy=='range' or strategy=='category_numeric':
         converted = pd.to_numeric(test_df[column_name].copy(), downcast='float', errors='coerce')
@@ -350,7 +342,6 @@ def binarizer_predict(test_df, column_name, dict_strategies, dict_one_hot_values
                     lower_bound = col[0]
                     upper_bound = col[1]
                     name = column_name + '$\in$(' + str(lower_bound) +', ' + str(upper_bound) + ']'
-                    # print(test_df[column_name])
                     one_hot[name] = (lower_bound<converted) & (converted<=upper_bound)
                 elif col=='nan':
                     name = column_name + '=nan'
