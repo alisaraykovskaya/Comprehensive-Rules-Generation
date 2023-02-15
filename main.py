@@ -6,7 +6,7 @@ from sklearn.metrics import classification_report
 
 config = {
     "load_data_params":{
-        "project_name": "DivideBy30", 
+        "project_name": "MRI", 
         "load_from_pkl": False
     },
 
@@ -23,15 +23,15 @@ config = {
         "excessive_models_num_coef": 3, # used for computing cropping threshold in workers
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
-        "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_features": 250, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
 
-        "complexity_restr_operators": 3, # Consider Boolean formulas, only with a given number of binary operators. It is worth noting that the value should not be less than subset_size-1
-        "complexity_restr_vars": None, # Consider Boolean formulas with only a given number of repetitions of one variable
+        "complexity_restr_operators": None, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
+        "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
 
-        "time_restriction_seconds": 5000, # Limiting the running time of the algorithm per subset_size
+        "time_restriction_seconds": 10800, # Limiting the running time of the algorithm per subset_size
 
         "incremental_run": True, # run algorithm on subset_size=1...subset_size
-        "crop_features_after_size": 1, # if crop_features and incremental_run, then cropping will occur after subset_size
+        "crop_features_after_size": 2, # if crop_features and incremental_run, then cropping will occur after subset_size
     },
   
     "similarity_filtering_params": {

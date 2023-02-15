@@ -61,7 +61,17 @@ def LoadData(project_name, load_from_pkl=False):
     elif project_name == "dont_overfit":
       df_name = "dont_overfit_train"
       target_name = "target"
-      file_ext = "csv" 
+      file_ext = "csv"
+
+    elif project_name == "MRI":
+      df_name = "MRI"
+      target_name = "outcome_First_to_Last_Measurement_Time"
+      file_ext = "xlsx"
+
+    elif project_name == "Collatz":
+      df_name = "Collatz20K"
+      target_name = "OverQ75"
+      file_ext = "csv"
 
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
@@ -134,26 +144,29 @@ def LoadData(project_name, load_from_pkl=False):
       df['Target'] = df['Target'].apply(lambda x: 0 if x == 'B' else 1)
       df.drop('id', axis=1, inplace=True)
 
-    if df_name == 'heart':
-      true_indices_ratio = 0.05
-      false_indices_ratio = 0.5
+    # if df_name == 'heart':
+    #   true_indices_ratio = 0.05
+    #   false_indices_ratio = 0.5
 
-      df['bad_feature'] = np.nan
-      true_indices = df.index[df['Target'] == True].tolist()
-      bad_feature_true_indices = random.sample(true_indices, k=int(len(true_indices) * true_indices_ratio))
-      mask_true = np.full(df.shape[0], False)
-      np.put(mask_true, bad_feature_true_indices, True)
-      mask_true = pd.Series(mask_true)
-      df['bad_feature'] = df['bad_feature'].where(~mask_true, True)
+    #   df['bad_feature'] = np.nan
+    #   true_indices = df.index[df['Target'] == True].tolist()
+    #   bad_feature_true_indices = random.sample(true_indices, k=int(len(true_indices) * true_indices_ratio))
+    #   mask_true = np.full(df.shape[0], False)
+    #   np.put(mask_true, bad_feature_true_indices, True)
+    #   mask_true = pd.Series(mask_true)
+    #   df['bad_feature'] = df['bad_feature'].where(~mask_true, True)
 
-      false_indices = df.index[df['Target'] == False].tolist()
-      bad_feature_false_indices = random.sample(false_indices, k=int(len(false_indices) * false_indices_ratio))
-      mask_false = np.full(df.shape[0], False)
-      np.put(mask_false, bad_feature_false_indices, True)
-      mask_false = pd.Series(mask_false)
-      df['bad_feature'] = df['bad_feature'].where(~mask_false, False)
-      print(df['bad_feature'].value_counts(normalize=True, dropna=False))
-      print(df['bad_feature'].value_counts(dropna=False))
+    #   false_indices = df.index[df['Target'] == False].tolist()
+    #   bad_feature_false_indices = random.sample(false_indices, k=int(len(false_indices) * false_indices_ratio))
+    #   mask_false = np.full(df.shape[0], False)
+    #   np.put(mask_false, bad_feature_false_indices, True)
+    #   mask_false = pd.Series(mask_false)
+    #   df['bad_feature'] = df['bad_feature'].where(~mask_false, False)
+    #   print(df['bad_feature'].value_counts(normalize=True, dropna=False))
+    #   print(df['bad_feature'].value_counts(dropna=False))
+    
+    if df_name == 'MRI':
+      df['Target'] = df['Target'].apply(lambda x: 1 if x > 1600 else 0)
 
     # Change column names
     df.columns = list(map(change_column_name,df.columns))
