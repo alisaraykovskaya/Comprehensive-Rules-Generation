@@ -129,9 +129,9 @@ def add_equal_suffix(string):
             return (s[::-1].replace(old[::-1],new[::-1], 1))[::-1]
 
         if '(' in string and ']' in string:
-            string = str(rreplace(string, '_', '$\in$'))
+            string = str(rreplace(string, '_', '∈'))
         elif '(' in string and ')' in string:
-            string = str(rreplace(string, '_', '$\in$'))
+            string = str(rreplace(string, '_', '∈'))
             string = str(rreplace(string, ')', ']'))
         elif '<=' not in string:
             string = str(rreplace(string, '_', '='))
@@ -344,7 +344,7 @@ def binarizer_predict(test_df, column_name, dict_strategies, dict_one_hot_values
                 if col!='nan' and col!='others':
                     lower_bound = col[0]
                     upper_bound = col[1]
-                    name = column_name + '$\in$(' + str(lower_bound) +', ' + str(upper_bound) + ']'
+                    name = column_name + '∈(' + str(lower_bound) +', ' + str(upper_bound) + ']'
                     one_hot[name] = (lower_bound<converted) & (converted<=upper_bound)
                 elif col=='nan':
                     name = column_name + '=nan'
