@@ -37,7 +37,7 @@ def drop_unbalanced(one_hot, column_name, numerical_binarization, share_to_drop)
 
     #for categorical variables and for numerical variables with range binarization           
     if numerical_binarization=='range':
-        
+        others_list =[]
         #if the column was binary -> pass the processing
         if len(one_hot.columns)==1:
             pass
@@ -51,7 +51,6 @@ def drop_unbalanced(one_hot, column_name, numerical_binarization, share_to_drop)
             while col_sum<=1-share_to_drop and i<len(ones_dict): #and i<len(ones_dict):
                 col_sum+=ones_dict[i][1]
                 i+=1
-            others_list =[]
             if i!=len(ones_dict)-1:
                 for m in range(i,len(ones_dict)): 
                     others_list.append(ones_dict[m][0])
