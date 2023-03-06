@@ -250,7 +250,7 @@ class CRG:
                         'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'False',  'simple_formula': simple_formula, 'columns_set': columns_set, \
                         'number_of_binary_operators': formula_dict['number_of_binary_operators'], 'max_freq_of_variables': formula_dict['max_freq_of_variables']}
                     if self.sim_metric == 'JAC_SCORE':
-                        model_info['result'] = result
+                        model_info['result'] = negate_model(result)
                     else:
                         model_info['result'] = None
                     best_models.append(model_info)
