@@ -17,7 +17,7 @@ from numba import njit
 
 from utils import model_string_gen, simplify_expr, find_sum, sums_generator, similarity_filtering, list_to_df, post_simplify, beautify_simple, beautify_summed
 from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string
-from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set
+from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
 from metrics_utils import negate_model
 from best_models import make_nan_mask, apply_nan_mask_list
 
@@ -223,7 +223,7 @@ class CRG:
                 result = apply_nan_mask_list(result, nan_mask)
 
                 tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
-                precision, recall, f1, rocauc, accuracy = calculate_metrics_for(tp, fp, fn, tn)
+                precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
 
                 if self.quality_metric == 'f1_1':
                     quality = f1
@@ -257,30 +257,31 @@ class CRG:
                 # checking negated model
                 expr = formula_dict['neg_expr']
                 summed_expr = formula_dict['neg_summed_expr']
-                result_neg = negate_model(result)
-                tp, fp, fn, tn = count_confusion_matrix(self.y_true, result_neg)
-                precision, recall, f1, rocauc, accuracy = calculate_metrics_for(tp, fp, fn, tn)
+
+                precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
+                precision_neg, recall_neg, f1_neg, rocauc_neg, accuracy_neg = calculate_metrics_for_negation(recall, fpr, accuracy, precision_0)
+
                 if self.quality_metric == 'f1_1':
-                    quality = f1
+                    quality = f1_neg
                 elif self.quality_metric == 'precision_1':
-                    quality = precision
+                    quality = precision_neg
                 elif self.quality_metric == 'recall_1':
-                    quality = recall
+                    quality = recall_neg
                 elif self.quality_metric == 'rocauc':
-                    quality = rocauc
+                    quality = rocauc_neg
                 elif self.quality_metric == 'accuracy':
-                    quality = accuracy
+                    quality = accuracy_neg
                 if quality > min_quality:
-                    precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
-                    recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
+                    precision_0 = 1 - precision
+                    recall_0 = recall
                     f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
                     columns_set = get_parent_set(columns)
                     elapsed_time = time() - self.start_time
                     simple_formula = expr
                     for i in range(subset_size):
                         simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
-                    model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
-                        'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
+                    model_info = {'f1_1': f1_neg, 'f1_0': f1_0, 'tn': fp, 'fp': tn, 'fn': tp, 'tp': fn, 'precision_1': precision_neg, 'precision_0': precision_0,\
+                        'recall_1': recall_neg, 'recall_0': recall_0, 'rocauc': rocauc_neg, 'accuracy': accuracy_neg, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
                         'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'True', 'simple_formula': simple_formula, 'columns_set': columns_set, \
                         'number_of_binary_operators': formula_dict['neg_number_of_binary_operators'], 'max_freq_of_variables': formula_dict['neg_max_freq_of_variables']}
                     if self.sim_metric == 'JAC_SCORE':

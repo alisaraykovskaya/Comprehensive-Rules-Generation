@@ -44,7 +44,17 @@ def calculate_metrics_for(tp, fp, fn, tn):
     fpr = 0 if (fp + tn) == 0 else fp / (fp + tn)
     rocauc = (1 + recall - fpr) / 2
     accuracy = 0 if (tp + fp + fn + tn) == 0 else (tp + tn) / (tp + fp + fn + tn)
+    return precision, recall, f1, rocauc, accuracy, fpr
+
+def calculate_metrics_for_negation(recall, fpr, accuracy, precision_0):
+    precision = 1 - precision_0
+    recall = 1 - recall
+    f1 = 0 if (precision + recall) == 0 else 2 * (precision * recall) / (precision + recall)
+    fpr = 1 - fpr
+    rocauc = (1 + recall - fpr) / 2
+    accuracy = 1 - accuracy
     return precision, recall, f1, rocauc, accuracy
+
 
 
 @vectorize
