@@ -29,6 +29,7 @@ class Binarizer:
 
         self.dict_strategies = {}
         self.dict_one_hot_values = {}
+        self.parent_features_dict = {}
 
 
     def fit_transform(self, df):
@@ -43,11 +44,12 @@ class Binarizer:
 
         dict_strategies = {}
         dict_one_hot_values = {}
+        parent_features_dict = {}
 
         for column in df.columns:
             if column != 'Target':
                 print(column)
-                binarized, dict_strategies, dict_one_hot_values = binarize(df, column, self.unique_threshold, self.q, self.exceptions_threshold, self.numerical_binarization, self.nan_threshold, self.share_to_drop, self.create_nan_features, dict_strategies, dict_one_hot_values)
+                binarized, dict_strategies, dict_one_hot_values, parent_features_dict = binarize(df, column, self.unique_threshold, self.q, self.exceptions_threshold, self.numerical_binarization, self.nan_threshold, self.share_to_drop, self.create_nan_features, dict_strategies, dict_one_hot_values, parent_features_dict)
                 if binarized is not None:
                     df = df.join(binarized)
                     df.drop(column, axis=1, inplace=True)
@@ -60,6 +62,7 @@ class Binarizer:
 
         self.dict_strategies = dict_strategies
         self.dict_one_hot_values = dict_one_hot_values
+        self.parent_features_dict = parent_features_dict
 
         if not self.load_from_pkl:
             df.to_pickle(f'./Data/{self.project_name}_train_binarized.pkl')

@@ -6,13 +6,13 @@ from sklearn.metrics import classification_report
 
 config = {
     "load_data_params":{
-        "project_name": "MRI", 
+        "project_name": "Titanic", 
         "load_from_pkl": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 4, # number of variables for boolean formula in models
+        "subset_size": 2, # number of variables for boolean formula in models
 
         "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload. number_of_models = batch_size * formula_number
@@ -24,6 +24,7 @@ config = {
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
         "crop_features": 250, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_parent_features":20,
 
         "complexity_restr_operators": None, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number

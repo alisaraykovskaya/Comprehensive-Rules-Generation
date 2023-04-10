@@ -148,7 +148,7 @@ def replace_nans(one_hot,column_name, df):
 
 
 
-def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop, create_nan_features, dict_strategies, dict_one_hot_values):
+def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numerical_binarization, nan_threshold, share_to_drop, create_nan_features, dict_strategies, dict_one_hot_values, parent_features_dict):
     num_NA = len(df[df[column_name].isna()])
     nan_share = num_NA/len(df[column_name])
     
@@ -271,18 +271,19 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
                 return None
 
         one_hot.columns = list(map(add_equal_suffix,one_hot.columns))
-    
+
         # removing nan columns
         if not create_nan_features:
             for col in one_hot.columns:
                 if '=nan' in col:
                     one_hot = one_hot.drop(columns = [col])
                     dict_one_hot_values[column_name].remove('nan')
-         
-        return one_hot, dict_strategies, dict_one_hot_values
+
+        parent_features_dict[column_name] = list(one_hot.columns)
+        return one_hot, dict_strategies, dict_one_hot_values, parent_features_dict
 
     else:
-        return None, dict_strategies, dict_one_hot_values
+        return None, dict_strategies, dict_one_hot_values, parent_features_dict
 
 def boolarize(value):
     if value==1:
@@ -297,7 +298,7 @@ def boolarize(value):
 def binarize_df(df, unique_threshold=20, q=20, exceptions_threshold=0.01, numerical_binarization='threshold', nan_threshold = 0.8, share_to_drop=0.05, create_nan_features=True):
     dict_strategies = {}
     dict_one_hot_values = {}
-
+    parent_features_dict = {}
 
     for column in df.columns:
         if column != 'Target':
@@ -314,7 +315,7 @@ def binarize_df(df, unique_threshold=20, q=20, exceptions_threshold=0.01, numeri
     for col in df.columns:
         df[col] = df[col].apply(boolarize)
 
-    return df, dict_strategies, dict_one_hot_values
+    return df, dict_strategies, dict_one_hot_values, parent_features_dict
 
 
 ### Сюда должен подаваться датасет (test_df) после loadData

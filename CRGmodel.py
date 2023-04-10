@@ -7,6 +7,7 @@ from itertools import combinations, chain, islice
 from copy import deepcopy
 import operator
 from datetime import datetime
+import itertools
 
 import pandas as pd
 import numpy as np
@@ -38,6 +39,7 @@ class CRG:
         excessive_models_num_coef=3,
         dataset_frac=1,
         crop_features=-1,
+        crop_parent_features=20,
         complexity_restr_operators=None,
         complexity_restr_vars=None,
         time_restriction_seconds=None,
@@ -60,6 +62,7 @@ class CRG:
         self.excessive_models_num_coef = excessive_models_num_coef
         self.dataset_frac = dataset_frac
         self.crop_features = crop_features
+        self.crop_parent_features = crop_parent_features
         self.complexity_restr_operators=complexity_restr_operators
         self.complexity_restr_vars=complexity_restr_vars
         self.time_restriction_seconds = time_restriction_seconds
@@ -68,6 +71,7 @@ class CRG:
         self.sim_metric = sim_metric
         self.min_jac_score = min_jac_score
         self.min_same_parents = min_same_parents
+        
 
         if 'windows' in platform.system().lower():
             freeze_support()
@@ -100,6 +104,7 @@ class CRG:
 
         print('BINARIZING DATA...')
         self.df = self.binarizer.fit_transform(self.raw_df)
+        self.parent_features_dict = self.binarizer.parent_features_dict
 
         if self.dataset_frac != 1:
             self.df, _ = train_test_split(df, train_size=self.dataset_frac, stratify=self.df['Target'], random_state=12)
@@ -116,7 +121,17 @@ class CRG:
         best_1_variable = self.find_best_models(is_onevar=True)
         elapsed_time = time() - start_time
         self.log_exec(subset_size=1, elapsed_time=elapsed_time, rows_num=self.df.shape[0], cols_num=self.df.shape[1])
-        self.columns_ordered = get_1var_importance_order(best_1_variable, subset_size=1, columns_number=columns_number)
+        self.columns_ordered, parent_features_ordered = get_1var_importance_order(best_1_variable, subset_size=1, columns_number=columns_number, parent_features_dict = self.parent_features_dict)
+        
+        # Crop features with respect to parents
+        for parent in parent_features_ordered.keys():
+            parent_features_ordered[parent] = parent_features_ordered[parent][:self.crop_parent_features]
+        features_to_use = list(itertools.chain(*list(parent_features_ordered.values())))
+        columns_ordered = []
+        for col in self.columns_ordered:
+            if col in features_to_use:
+                columns_ordered.append(col)
+        self.columns_ordered = columns_ordered
         if self.crop_features != -1 and (self.incremental_run and self.crop_features_after_size == 1 or not self.incremental_run):
             self.columns_ordered = self.columns_ordered[:self.crop_features]
             print(f'\nNumber of features is croped by {self.crop_features}')

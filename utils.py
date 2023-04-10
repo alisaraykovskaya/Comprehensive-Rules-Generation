@@ -9,18 +9,30 @@ from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
 
 
-def get_1var_importance_order(best_models, subset_size, columns_number):
+def get_1var_importance_order(best_models, subset_size, columns_number, parent_features_dict):
     columns_set = set()
     columns_ordered = []
+    #reverse parent_features_dict for easier parent access
+    feature_parent_dict = {}
+    for key in parent_features_dict.keys():
+        for val in parent_features_dict[key]:
+            feature_parent_dict[val]=key
+    
+    parent_features_ordered = {}
     for i in range(len(best_models)):
         column_names = best_models[i]['columns']
         for column_name in column_names:
+            parent = feature_parent_dict[column_name]
             if column_name not in columns_set:
                 columns_set.add(column_name)
                 columns_ordered.append(column_name)
+                if parent in parent_features_ordered.keys():
+                    parent_features_ordered[parent].append(column_name)
+                else:
+                    parent_features_ordered[parent] = [column_name]
     if subset_size == 1 and len(columns_ordered) != columns_number:
         print('Something went WRONG with feature importance: len(columns_ordered) != columns_number')
-    return columns_ordered
+    return columns_ordered, parent_features_ordered
 
 # P.S. Считать фича импотанс считать до фильтровки моделей. Эта функция возвращает упорядоченный датафрейм с важностью, 
 # чтобы получить поселодовательность, надо взять list(importances_df.index)
