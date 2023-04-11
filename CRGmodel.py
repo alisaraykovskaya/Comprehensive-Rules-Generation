@@ -2,12 +2,16 @@ from os import path, mkdir
 import platform
 from time import time
 from math import factorial
-from multiprocessing import freeze_support, cpu_count, Pool
+from multiprocessing import freeze_support, cpu_count, Pool, current_process
 from itertools import combinations, chain, islice
 from copy import deepcopy
 import operator
 from datetime import datetime
 import itertools
+import psutil
+from memory_profiler import profile
+import sys
+import gc
 
 import pandas as pd
 import numpy as np
@@ -17,7 +21,7 @@ import boolean
 from numba import njit
 
 from utils import model_string_gen, simplify_expr, find_sum, sums_generator, similarity_filtering, list_to_df, post_simplify, beautify_simple, beautify_summed
-from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string
+from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string, get_readable_size
 from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
 from metrics_utils import negate_model
 from best_models import make_nan_mask, apply_nan_mask_list
@@ -97,6 +101,11 @@ class CRG:
         self.onevar_sim_metric = "PARENT"
         self.onevar_min_same_parents = 2
 
+        # process = psutil.Process()
+        # memory_info = process.memory_info()
+        # memory_usage = memory_info.rss / 1024 / 1024
+        # print(f"Memory usage: {memory_usage:.2f} MB")
+
 
     def fit(self, df, y_true):
         self.raw_df = df.copy()
@@ -107,8 +116,8 @@ class CRG:
         self.parent_features_dict = self.binarizer.parent_features_dict
 
         if self.dataset_frac != 1:
-            self.df, _ = train_test_split(df, train_size=self.dataset_frac, stratify=self.df['Target'], random_state=12)
-
+            self.df, _ = train_test_split(self.df, train_size=self.dataset_frac, stratify=self.df['Target'], random_state=12)
+        # print(self.df)
         self.y_true = self.df['Target']
         self.df = self.df.drop(columns=['Target'])
         self.columns_ordered = self.df.columns
@@ -124,8 +133,8 @@ class CRG:
         self.columns_ordered, parent_features_ordered = get_1var_importance_order(best_1_variable, subset_size=1, columns_number=columns_number, parent_features_dict = self.parent_features_dict)
         
         # Crop features with respect to parents
-        for parent in parent_features_ordered.keys():
-            parent_features_ordered[parent] = parent_features_ordered[parent][:self.crop_parent_features]
+        # for parent in parent_features_ordered.keys():
+        #     parent_features_ordered[parent] = parent_features_ordered[parent][:self.crop_parent_features]
         features_to_use = list(itertools.chain(*list(parent_features_ordered.values())))
         columns_ordered = []
         for col in self.columns_ordered:
@@ -195,30 +204,21 @@ class CRG:
             print(result.shape)
             result = np.rint(np.mean(result, axis=1)).astype(bool)
         return result
-            
-
-
-
-        # if k_best is int:
-        #     take model with k_best id and predict
-        # if k_best is list:
-        #     make an ensemble of models and predict
-
-        # self.y_true
 
 
     def worker_init(self):
         self.start_time = time()
 
-
+    # @profile
     def worker(self, start_idx, end_idx, min_quality, subset_size):
         if subset_size == 1:
             crop_number_in_workers = self.onevar_crop_number_in_workers
         else:
             crop_number_in_workers = self.crop_number_in_workers
         best_models = []
-        for columns in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
-            columns = list(columns)
+        count = 0
+        for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
+            columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
             df_np_cols = []
             df_nan_cols = []
@@ -227,14 +227,14 @@ class CRG:
                 df_nan_cols.append(self.df_dict[col]['nan_mask'])
             df_np_cols = np.array(df_np_cols)
             df_nan_cols = np.array(df_nan_cols)
+            nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
+            nan_count = np.count_nonzero(nan_mask)
 
             for formula_dict in self.all_formulas:
                 formula_template = formula_dict['formula_template']
                 expr = formula_dict['expr']
                 summed_expr = formula_dict['summed_expr']
                 result = formula_template(df_np_cols)
-                nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
-                nan_count = np.count_nonzero(nan_mask)
                 result = apply_nan_mask_list(result, nan_mask)
 
                 tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
@@ -304,12 +304,23 @@ class CRG:
                     else:
                         model_info['result'] = None
                     best_models.append(model_info)
-
+                
+                # count += 1
+                # if count % 100 == 0:
+                #     gc.collect()
+                #     for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(locals().items())), key= lambda x: -x[1])[:10]:
+                #         print(f"{current_process().name}: {name}: {get_readable_size(size)}")
 
                 if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * self.excessive_models_num_coef:
+                    # for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(locals().items())), key= lambda x: -x[1])[:10]:
+                    #     print(f"{current_process().name}: {name}: {get_readable_size(size)}")
                     best_models.sort(key=lambda row: (row[self.quality_metric], -row['number_of_binary_operators']), reverse=True)
                     best_models = best_models[:crop_number_in_workers]
                     min_quality = best_models[-1][self.quality_metric]
+                    # for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(locals().items())), key= lambda x: -x[1])[:10]:
+                    #     print(f"{current_process().name}: {name}: {get_readable_size(size)}")
+                    # gc.collect()
+                
 
         return best_models
 
@@ -429,8 +440,11 @@ class CRG:
             if len(batch) >= self.process_number or last_reload:
                 # print(batch)
                 # print('Workers time')
-                new_models = pool.starmap(self.worker, batch)
-                new_models = list(chain.from_iterable(new_models))
+                if self.process_number == 1:
+                    new_models = self.worker(*batch[0])
+                else:
+                    new_models = pool.starmap(self.worker, batch)
+                    new_models = list(chain.from_iterable(new_models))
                 self.best_models = list(chain.from_iterable([self.best_models, new_models]))
                 # print('got models')
                 self.best_models.sort(key=lambda row: (row[self.quality_metric], -row['number_of_binary_operators']), reverse=True)

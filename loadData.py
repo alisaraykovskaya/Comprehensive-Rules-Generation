@@ -73,6 +73,11 @@ def LoadData(project_name, load_from_pkl=False):
       target_name = "OverQ75"
       file_ext = "csv"
 
+    elif project_name == "problem_sample2":
+      df_name = "ProblemSample 2"
+      target_name = "Target"
+      file_ext = "xlsx"
+
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       
@@ -167,6 +172,9 @@ def LoadData(project_name, load_from_pkl=False):
     
     if df_name == 'MRI':
       df['Target'] = df['Target'].apply(lambda x: 1 if x > 1600 else 0)
+
+    if df_name == 'ProblemSample 2':
+      df['Target'] = df['Target'].apply(lambda x: 1 if x > 7 else 0)
 
     # Change column names
     df.columns = list(map(change_column_name,df.columns))

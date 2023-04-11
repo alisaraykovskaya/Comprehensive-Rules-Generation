@@ -46,6 +46,7 @@ def calculate_metrics_for(tp, fp, fn, tn):
     accuracy = 0 if (tp + fp + fn + tn) == 0 else (tp + tn) / (tp + fp + fn + tn)
     return precision, recall, f1, rocauc, accuracy, fpr
 
+
 def calculate_metrics_for_negation(recall, fpr, accuracy, precision_0):
     precision = 1 - precision_0
     recall = 1 - recall

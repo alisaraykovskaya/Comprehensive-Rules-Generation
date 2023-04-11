@@ -285,3 +285,13 @@ def log_exec(file_name, rows_num, cols_num, elapsed_time, sim_metric, min_jac_sc
              'subset_size': [subset_size], 'batch_size': [batch_size], 'process_number': [process_number], 'elapsed_time': [elapsed_time]})
         with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
                 log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
+
+
+def get_readable_size(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            # return "%3.1f %s%s" % (num, unit, suffix)
+            return f"{num:.1f} {unit}{suffix}"
+        num /= 1024.0
+    # return "%.1f %s%s" % (num, 'Yi', suffix)
+    return f"{num:.1f} Yi{suffix}"
