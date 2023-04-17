@@ -133,8 +133,8 @@ class CRG:
         self.columns_ordered, parent_features_ordered = get_1var_importance_order(best_1_variable, subset_size=1, columns_number=columns_number, parent_features_dict = self.parent_features_dict)
         
         # Crop features with respect to parents
-        # for parent in parent_features_ordered.keys():
-        #     parent_features_ordered[parent] = parent_features_ordered[parent][:self.crop_parent_features]
+        for parent in parent_features_ordered.keys():
+            parent_features_ordered[parent] = parent_features_ordered[parent][:self.crop_parent_features]
         features_to_use = list(itertools.chain(*list(parent_features_ordered.values())))
         columns_ordered = []
         for col in self.columns_ordered:
@@ -414,9 +414,10 @@ class CRG:
         total_model_count = formulas_number * subset_number
         print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_model_count}')
 
-        worker_timer = time()
-        pool = Pool(self.process_number, initializer=self.worker_init)
-        print(f'number of workers launched: {self.process_number}  time to launch: {time() - worker_timer}')
+        if self.process_number > 1:
+            worker_timer = time()
+            pool = Pool(self.process_number, initializer=self.worker_init)
+            print(f'number of workers launched: {self.process_number}  time to launch: {time() - worker_timer}')
 
         start_time = time()
         self.best_models = []
@@ -482,10 +483,11 @@ class CRG:
                 print(f'processed_models: {current_model_count/total_model_count * 100:.1f}%  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(total_model_count - current_model_count) * elapsed_time_per_model:.2f}')
                 if self.time_restriction_seconds is not None and (time() - start_time) > self.time_restriction_seconds:
                     break
-        worker_timer = time()
-        pool.close()
-        pool.join()
-        print(f'number of workers terminated: {self.process_number}  time to terminate: {time() - worker_timer}')
+        if self.process_number > 1:
+            worker_timer = time()
+            pool.close()
+            pool.join()
+            print(f'number of workers terminated: {self.process_number}  time to terminate: {time() - worker_timer}')
         self.best_models_dict[subset_size] = deepcopy(self.best_models)
         return best_models_not_filtered
 
