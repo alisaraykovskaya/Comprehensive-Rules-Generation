@@ -180,7 +180,7 @@ class CRG:
         for col in df_test.columns:
             df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
         result = []
-        
+        variables = list(map(chr, range(122, 122-subset_size,-1)))
         if isinstance(k_best, int):
             if subset_size not in self.best_models_dict:
                 print(f"The algorithm did not run for subset_size={subset_size}")
@@ -196,10 +196,11 @@ class CRG:
                     df_nan_cols.append(df_test_dict[col]['nan_mask'])
                 df_np_cols = np.array(df_np_cols)
                 df_nan_cols = np.array(df_nan_cols)
-
+                local_dict = {}
+                for i in range(len(variables)):
+                    local_dict[variables[i]] = df_np_cols[i]
                 expr = model_dict['expr']
-                model_template = eval(f'njit(lambda df_np_cols: {expr})')
-                tmp = model_template(df_np_cols)
+                tmp = ne.evaluate(expr, local_dict=local_dict)
                 result.append(tmp)
             result = np.stack(result, axis=-1)
             print(result.shape)
