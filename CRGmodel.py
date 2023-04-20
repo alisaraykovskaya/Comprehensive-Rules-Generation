@@ -12,6 +12,7 @@ import psutil
 from memory_profiler import profile
 import sys
 import gc
+import numexpr as ne
 
 import pandas as pd
 import numpy as np
@@ -210,7 +211,7 @@ class CRG:
         self.start_time = time()
 
     # @profile
-    def worker(self, start_idx, end_idx, min_quality, subset_size):
+    def worker(self, start_idx, end_idx, min_quality, subset_size, variables):
         if subset_size == 1:
             crop_number_in_workers = self.onevar_crop_number_in_workers
         else:
@@ -229,12 +230,15 @@ class CRG:
             df_nan_cols = np.array(df_nan_cols)
             nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
             nan_count = np.count_nonzero(nan_mask)
+            local_dict = {}
+            for i in range(len(variables)):
+                local_dict[variables[i]] = df_np_cols[i]
 
             for formula_dict in self.all_formulas:
-                formula_template = formula_dict['formula_template']
+                #formula_template = formula_dict['formula_template']
                 expr = formula_dict['expr']
                 summed_expr = formula_dict['summed_expr']
-                result = formula_template(df_np_cols)
+                result = ne.evaluate(expr, local_dict=local_dict)
                 result = apply_nan_mask_list(result, nan_mask)
 
                 tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
@@ -259,7 +263,7 @@ class CRG:
                     elapsed_time = time() - self.start_time
                     simple_formula = expr
                     for i in range(subset_size):
-                        simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
+                        simple_formula = simple_formula.replace(variables[i], columns[i])
                     model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
                         'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
                         'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'False',  'simple_formula': simple_formula, 'columns_set': columns_set, \
@@ -294,7 +298,7 @@ class CRG:
                     elapsed_time = time() - self.start_time
                     simple_formula = expr
                     for i in range(subset_size):
-                        simple_formula = simple_formula.replace(f'df_np_cols[{i}]', columns[i])
+                        simple_formula = simple_formula.replace(variables[i], columns[i])
                     model_info = {'f1_1': f1_neg, 'f1_0': f1_0, 'tn': fp, 'fp': tn, 'fn': tp, 'tp': fn, 'precision_1': precision_neg, 'precision_0': precision_0,\
                         'recall_1': recall_neg, 'recall_0': recall_0, 'rocauc': rocauc_neg, 'accuracy': accuracy_neg, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
                         'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'True', 'simple_formula': simple_formula, 'columns_set': columns_set, \
@@ -395,12 +399,12 @@ class CRG:
 
             # Replace one-charachter variables in simplified expr with 'df[columns[{i}]]'
             # for easy execution
-            for i in range(subset_size):
-                simple_expr = simple_expr.replace(variables[i], f'df_np_cols[{i}]')
-                neg_simple_expr = neg_simple_expr.replace(variables[i], f'df_np_cols[{i}]')
+            # for i in range(subset_size):
+            #     simple_expr = simple_expr.replace(variables[i], f'df_np_cols[{i}]')
+            #     neg_simple_expr = neg_simple_expr.replace(variables[i], f'df_np_cols[{i}]')
 
             self.all_formulas.append({
-                'formula_template': eval(f'njit(lambda df_np_cols: {simple_expr})'),
+                #'formula_template': eval(f'njit(lambda df_np_cols: {simple_expr})'),
                 'expr': simple_expr,
                 'summed_expr': summed_expr,
                 'number_of_binary_operators': number_of_binary_operators,
@@ -428,7 +432,7 @@ class CRG:
         last_reload = False
         for subset_index in range(0, subset_number, batch_size):
             if subset_number - subset_index <= batch_size:
-                batch.append((subset_index, subset_number, min_quality, subset_size))
+                batch.append((subset_index, subset_number, min_quality, subset_size, variables))
                 current_model_count += (subset_number - subset_index) * formulas_number
                 last_reload = True
             else:
