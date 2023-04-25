@@ -61,16 +61,23 @@ def add_missing_features(sorted_features_old, sorted_features_new):
 
 # @log_sparse
 def similarity_filtering(best_models, metric, min_jac_score, min_same_parents):
-    i = 0
+    filtered_models = []
 
-    while i < len(best_models):
-        for j in range(len(best_models)-1, i, -1):
-            if compare_model_similarity(best_models[i], best_models[j], metric, min_jac_score, min_same_parents):
-                if best_models[i]['f1_1'] == best_models[j]['f1_1'] and best_models[i]['expr_len'] > best_models[j]['expr_len']:
-                    best_models[i] = best_models[j]
-                del best_models[j]
-        i += 1
-    return best_models
+    for i, model in enumerate(best_models):
+        is_duplicate = False
+
+        for j, other_model in enumerate(filtered_models):
+            if compare_model_similarity(model, other_model, metric, min_jac_score, min_same_parents):
+                if model["f1_1"] == other_model["f1_1"]:
+                    if model["number_of_binary_operators"] < other_model["number_of_binary_operators"]:
+                        filtered_models[j] = model  # Replace the duplicate with the current model
+                is_duplicate = True
+                break
+
+        if not is_duplicate:
+            filtered_models.append(model)
+
+    return filtered_models
 
 
 # List of tuples (best_models) to dataframe
@@ -94,7 +101,7 @@ def list_to_df(best_formulas):
 #        expr = ' | '.join(terms)
 #        yield expr
 
-def model_string_gen(vars_num):
+def model_string_gen(vars_num, variables):
     inputs = list(product([False, True], repeat=vars_num))
     list_of_outputs = []
     #print(inputs)
@@ -104,7 +111,7 @@ def model_string_gen(vars_num):
             terms = []
             for j in range(len(output)):
                 if output[j]:
-                    terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
+                    terms.append(' & '.join([variables[i] if input_ else '~' + variables[i] for i, input_ in enumerate(inputs[j])]))
             if not terms:
                 terms = ['False']
                 continue
@@ -112,12 +119,12 @@ def model_string_gen(vars_num):
             yield expr, output
 
 
-def outputs_to_model_string(output, vars_num):
+def outputs_to_model_string(output, vars_num, variables):
     terms = []
     inputs = list(product([False, True], repeat=vars_num))
     for j in range(len(output)):
         if output[j]:
-            terms.append(' & '.join(['df_np_cols[' + str(i) +']' if input_ else '~df_np_cols[' + str(i) +']' for i, input_ in enumerate(inputs[j])]))
+            terms.append(' & '.join([variables[i] if input_ else '~' + variables[i] for i, input_ in enumerate(inputs[j])]))
     if not terms:
         terms = ['False']
     expr = ' | '.join(terms)
@@ -142,10 +149,7 @@ def get_1var_importance_config(main_config, columns_number):
 # In order to simplify and find sums in expression we need to
 # replace 'df[columns[{i}]]' with one-character variables
 def simplify_expr(expr, subset_size, variables, algebra):
-    simple_expr = expr
-    for i in range(subset_size):
-        simple_expr = simple_expr.replace(f'df_np_cols[{i}]', variables[i])
-    simple_expr = str(algebra.parse(simple_expr).simplify())
+    simple_expr = str(algebra.parse(expr).simplify())
     return simple_expr
 
 

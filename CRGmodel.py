@@ -222,24 +222,20 @@ class CRG:
         for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
-            df_np_cols = []
+            local_dict = {}
             df_nan_cols = []
-            for col in columns:
-                df_np_cols.append(self.df_dict[col]['data'])
-                df_nan_cols.append(self.df_dict[col]['nan_mask'])
-            df_np_cols = np.array(df_np_cols)
+            for i in range(subset_size):
+                local_dict[variables[i]] = self.df_dict[columns[i]]['data']
+                df_nan_cols.append(self.df_dict[columns[i]]['nan_mask'])
             df_nan_cols = np.array(df_nan_cols)
             nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
             nan_count = np.count_nonzero(nan_mask)
-            local_dict = {}
-            for i in range(len(variables)):
-                local_dict[variables[i]] = df_np_cols[i]
 
             for formula_dict in self.all_formulas:
-                #formula_template = formula_dict['formula_template']
-                expr = formula_dict['expr']
-                summed_expr = formula_dict['summed_expr']
-                result = ne.evaluate(expr, local_dict=local_dict)
+                formula = formula_dict['formula']
+                summed_formula = formula_dict['summed_formula']
+                readable_formula = formula_dict['readable_formula']
+                result = ne.evaluate(formula, local_dict=local_dict)
                 result = apply_nan_mask_list(result, nan_mask)
 
                 tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
@@ -262,12 +258,11 @@ class CRG:
                     f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
                     columns_set = get_parent_set(columns)
                     elapsed_time = time() - self.start_time
-                    simple_formula = expr
                     for i in range(subset_size):
-                        simple_formula = simple_formula.replace(variables[i], columns[i])
+                        readable_formula = readable_formula.replace(f"var[{i}]", columns[i])
                     model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
                         'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
-                        'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'False',  'simple_formula': simple_formula, 'columns_set': columns_set, \
+                        'summed_expr': summed_formula, 'columns': columns, 'expr': formula, 'expr_len': len(formula), 'is_negated': 'False',  'simple_formula': readable_formula, 'columns_set': columns_set, \
                         'number_of_binary_operators': formula_dict['number_of_binary_operators'], 'max_freq_of_variables': formula_dict['max_freq_of_variables']}
                     if self.sim_metric == 'JAC_SCORE':
                         model_info['result'] = negate_model(result)
@@ -275,8 +270,9 @@ class CRG:
                         model_info['result'] = None
                     best_models.append(model_info)
                 # checking negated model
-                expr = formula_dict['neg_expr']
-                summed_expr = formula_dict['neg_summed_expr']
+                formula = formula_dict['neg_formula']
+                summed_formula = formula_dict['neg_summed_formula']
+                readable_formula = formula_dict['neg_readable_formula']
 
                 precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
                 precision_neg, recall_neg, f1_neg, rocauc_neg, accuracy_neg = calculate_metrics_for_negation(recall, fpr, accuracy, precision_0)
@@ -297,12 +293,11 @@ class CRG:
                     f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
                     columns_set = get_parent_set(columns)
                     elapsed_time = time() - self.start_time
-                    simple_formula = expr
                     for i in range(subset_size):
-                        simple_formula = simple_formula.replace(variables[i], columns[i])
+                        readable_formula = readable_formula.replace(f"var[{i}]", columns[i])
                     model_info = {'f1_1': f1_neg, 'f1_0': f1_0, 'tn': fp, 'fp': tn, 'fn': tp, 'tp': fn, 'precision_1': precision_neg, 'precision_0': precision_0,\
                         'recall_1': recall_neg, 'recall_0': recall_0, 'rocauc': rocauc_neg, 'accuracy': accuracy_neg, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
-                        'summed_expr': summed_expr, 'columns': columns, 'expr': expr, 'expr_len': len(expr), 'is_negated': 'True', 'simple_formula': simple_formula, 'columns_set': columns_set, \
+                        'summed_expr': summed_formula, 'columns': columns, 'expr': formula, 'expr_len': len(formula), 'is_negated': 'True', 'simple_formula': readable_formula, 'columns_set': columns_set, \
                         'number_of_binary_operators': formula_dict['neg_number_of_binary_operators'], 'max_freq_of_variables': formula_dict['neg_max_freq_of_variables']}
                     if self.sim_metric == 'JAC_SCORE':
                         model_info['result'] = result
@@ -372,7 +367,7 @@ class CRG:
             self.y_true = self.y_true.values.astype(float)
 
         self.all_formulas = []
-        for expr, output in model_string_gen(subset_size):
+        for expr, output in model_string_gen(subset_size, variables):
             simple_expr = simplify_expr(expr, subset_size, variables, algebra)
             # If formula is a tautology
             if simple_expr == '1':
@@ -390,28 +385,29 @@ class CRG:
             summed_expr = find_sum(sums_generator(subset_size), simple_expr)
 
             neg_output = tuple(map(operator.not_, output))
-            neg_expr = outputs_to_model_string(neg_output, subset_size)
+            neg_expr = outputs_to_model_string(neg_output, subset_size, variables)
             neg_simple_expr = simplify_expr(neg_expr, subset_size, variables, algebra)
 
             neg_number_of_binary_operators = count_operators(neg_simple_expr)
             neg_max_freq_of_variables = count_vars(neg_simple_expr)
 
             neg_summed_expr = find_sum(sums_generator(subset_size), neg_simple_expr)
-
-            # Replace one-charachter variables in simplified expr with 'df[columns[{i}]]'
-            # for easy execution
-            # for i in range(subset_size):
-            #     simple_expr = simple_expr.replace(variables[i], f'df_np_cols[{i}]')
-            #     neg_simple_expr = neg_simple_expr.replace(variables[i], f'df_np_cols[{i}]')
+            
+            readable_expr = simple_expr
+            neg_readable_expr = neg_simple_expr
+            for i in range(subset_size):
+                readable_expr = readable_expr.replace(variables[i], f'var[{i}]')
+                neg_readable_expr = neg_readable_expr.replace(variables[i], f'var[{i}]')
 
             self.all_formulas.append({
-                #'formula_template': eval(f'njit(lambda df_np_cols: {simple_expr})'),
-                'expr': simple_expr,
-                'summed_expr': summed_expr,
+                'formula': simple_expr,
+                'summed_formula': summed_expr,
+                'readable_formula': readable_expr,
                 'number_of_binary_operators': number_of_binary_operators,
                 'max_freq_of_variables': max_freq_of_variables,
-                'neg_expr': neg_simple_expr,
-                'neg_summed_expr': neg_summed_expr,
+                'neg_formula': neg_simple_expr,
+                'neg_summed_formula': neg_summed_expr,
+                'neg_readable_formula': neg_readable_expr,
                 'neg_number_of_binary_operators': neg_number_of_binary_operators,
                 'neg_max_freq_of_variables': neg_max_freq_of_variables
             })
@@ -437,7 +433,7 @@ class CRG:
                 current_model_count += (subset_number - subset_index) * formulas_number
                 last_reload = True
             else:
-                batch.append((subset_index, subset_index+batch_size, min_quality, subset_size))
+                batch.append((subset_index, subset_index+batch_size, min_quality, subset_size, variables))
                 current_model_count += batch_size * formulas_number
             
             if self.time_restriction_seconds is not None and (time() - start_time) > self.time_restriction_seconds:

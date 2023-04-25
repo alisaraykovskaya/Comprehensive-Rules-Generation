@@ -14,7 +14,7 @@ config = {
         "quality_metric": "f1", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 4, # number of variables for boolean formula in models
 
-        "process_number": 1, # int or "default" = 90% of cpu
+        "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload. number_of_models = batch_size * formula_number
         "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel between reloads best_models will contain similar models. May lead to not reproducible results.
         
@@ -23,15 +23,15 @@ config = {
         "excessive_models_num_coef": 3, # used for computing cropping threshold in workers
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
-        "crop_features": 100, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_features": 250, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_parent_features":20,
 
         "complexity_restr_operators": None, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
 
-        "time_restriction_seconds": 300, # Limiting the running time of the algorithm per subset_size
+        "time_restriction_seconds": 500, # Limiting the running time of the algorithm per subset_size
 
-        "incremental_run": False, # run algorithm on subset_size=1...subset_size
+        "incremental_run": True, # run algorithm on subset_size=1...subset_size
         "crop_features_after_size": 1, # if crop_features and incremental_run, then cropping will occur after subset_size
     },
   
