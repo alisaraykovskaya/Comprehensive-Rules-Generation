@@ -211,7 +211,7 @@ def binarize(df, column_name, unique_threshold, q, exceptions_threshold, numeric
                 elif numerical_binarization=='range':
                     one_hot_cols = list(one_hot.columns)
                     one_hot_cols[0]=(float('-inf'), one_hot.columns[0].right)
-                    if not type(one_hot_cols[-1])==str:
+                    if not type(one_hot_cols[-1])==str and not type(one_hot_cols[-1])==float:
                         one_hot_cols[-1]=(one_hot.columns[-1].left, float('inf'))
                     else:
                         one_hot_cols[-2]=(one_hot.columns[-2].left, float('inf'))

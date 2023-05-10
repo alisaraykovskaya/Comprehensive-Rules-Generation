@@ -24,12 +24,12 @@ config = {
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
         "crop_features": 250, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
-        "crop_parent_features":20,
+        "crop_parent_features": 20,
 
         "complexity_restr_operators": None, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
 
-        "time_restriction_seconds": 500, # Limiting the running time of the algorithm per subset_size
+        "time_restriction_seconds": 5000, # Limiting the running time of the algorithm per subset_size
 
         "incremental_run": True, # run algorithm on subset_size=1...subset_size
         "crop_features_after_size": 1, # if crop_features and incremental_run, then cropping will occur after subset_size
@@ -45,7 +45,7 @@ config = {
         "unique_threshold": 20, # maximal number of unique values to consider numerical variable as category
         "q": 20, # number of quantiles to split numerical variable, can be lowered if there is need in speed
         "exceptions_threshold": 0.01, # max % of exeptions allowed while converting a variable into numeric to treat it as numeric 
-        "numerical_binarization": "range", # "range"
+        "numerical_binarization": "range", # "range" "threshold"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
         "share_to_drop": 0.005, # max % of zeros allowed for a binarized column or joint % of ones for the the most unballanced columns which are joined together into 'other' category.
         "create_nan_features": True # If true for every feature that contains nans, corresponding nan indecatore feature will be created

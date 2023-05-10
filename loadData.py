@@ -78,6 +78,11 @@ def LoadData(project_name, load_from_pkl=False):
       target_name = "Target"
       file_ext = "xlsx"
 
+    elif project_name == "HepatitisCdata":
+      df_name = "HepatitisCdata"
+      target_name = "Category"
+      file_ext = "csv"
+
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       
@@ -175,6 +180,12 @@ def LoadData(project_name, load_from_pkl=False):
 
     if df_name == 'ProblemSample 2':
       df['Target'] = df['Target'].apply(lambda x: 1 if x > 7 else 0)
+
+    if df_name == 'HepatitisCdata':
+      target_1 = set(["1=Hepatitis", "2=Fibrosis", "3=Cirrhosis"])
+      # target_0 = set(["0=Blood Donor", "0s=suspect Blood Donor"])
+      df['Target'] = df['Target'].apply(lambda x: 1 if x in target_1 else 0)
+      # df.drop(columns=["Unnamed_0"], inplace=True)
 
     # Change column names
     df.columns = list(map(change_column_name,df.columns))

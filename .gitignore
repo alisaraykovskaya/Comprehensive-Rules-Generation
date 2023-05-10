@@ -5,3 +5,5 @@ formulas*
 *.html
 test.py
 FeatureImportances
+*.pkl
+*.ipynb
