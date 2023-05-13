@@ -63,6 +63,11 @@ def LoadData(project_name, load_from_pkl=False):
       target_name = "target"
       file_ext = "csv"
 
+    elif project_name == "dont_overfit_test":
+      df_name = "dont_overfit_test"
+      target_name = "target"
+      file_ext = "csv"
+
     elif project_name == "MRI":
       df_name = "MRI"
       target_name = "outcome_First_to_Last_Measurement_Time"
@@ -83,6 +88,71 @@ def LoadData(project_name, load_from_pkl=False):
       target_name = "Category"
       file_ext = "csv"
 
+    elif project_name == "AirlinePassangerSatisfaction":
+      df_name = "AirlinePassangerSatisfaction_train"
+      target_name = "satisfaction"
+      file_ext = "csv"
+
+    elif project_name == "AirlinePassangerSatisfaction_test":
+      df_name = "AirlinePassangerSatisfaction_test"
+      target_name = "satisfaction"
+      file_ext = "csv"
+
+    elif project_name == "smoke_detection":
+      df_name = "smoke_detection_iot"
+      target_name = "Fire Alarm"
+      file_ext = "csv"
+
+    elif project_name == "smoking":
+      df_name = "smoking"
+      target_name = "smoking"
+      file_ext = "csv"
+
+    elif project_name == "go_to_college":
+      df_name = "go_to_college"
+      target_name = "will_go_to_college"
+      file_ext = "csv"
+
+    elif project_name == "stroke_prediction":
+      df_name = "stroke_prediction"
+      target_name = "stroke"
+      file_ext = "csv"
+
+    elif project_name == "diabetes_prediction_dataset":
+      df_name = "diabetes_prediction_dataset"
+      target_name = "diabetes"
+      file_ext = "csv"
+
+    elif project_name == "weatherAUS":
+      df_name = "weatherAUS"
+      target_name = "RainTomorrow"
+      file_ext = "csv"
+    
+    elif project_name == "Employee":
+      df_name = "Employee"
+      target_name = "LeaveOrNot"
+      file_ext = "csv"
+
+    elif project_name == "term_deposit_subscription":
+      df_name = "term_deposit_subscription"
+      target_name = "y"
+      file_ext = "csv"
+
+    elif project_name == "airlines_delay":
+      df_name = "airlines_delay"
+      target_name = "Class"
+      file_ext = "csv"
+
+    elif project_name == "Car_Ownership":
+      df_name = "Car Ownership"
+      target_name = "Car"
+      file_ext = "csv"
+
+    elif project_name == "patient_survival_prediction":
+      df_name = "patient_survival_prediction"
+      target_name = "hospital_death"
+      file_ext = "csv"
+
     else:
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       
@@ -93,7 +163,7 @@ def LoadData(project_name, load_from_pkl=False):
     if file_ext == 'xlsx':
       df = pd.read_excel(df_path, na_values='?', keep_default_na=True)
     if file_ext == 'csv':
-      if df_name == 'cardio_train' or df_name == 'hospital_death' or df_name == 'titanic':
+      if df_name == 'cardio_train' or df_name == 'hospital_death' or df_name == 'titanic' or df_name == 'term_deposit_subscription':
         df = pd.read_csv(df_path, na_values='?', keep_default_na=True ,sep=";")
       else:
         df = pd.read_csv(df_path, na_values='?', keep_default_na=True)
@@ -185,7 +255,18 @@ def LoadData(project_name, load_from_pkl=False):
       target_1 = set(["1=Hepatitis", "2=Fibrosis", "3=Cirrhosis"])
       # target_0 = set(["0=Blood Donor", "0s=suspect Blood Donor"])
       df['Target'] = df['Target'].apply(lambda x: 1 if x in target_1 else 0)
-      # df.drop(columns=["Unnamed_0"], inplace=True)
+
+    if df_name == 'AirlinePassangerSatisfaction' or df_name == 'AirlinePassangerSatisfaction_test':
+      df['Target'] = df['Target'].apply(lambda x: 1 if x == "satisfied" else 0)
+
+    if df_name == 'weatherAUS':
+      df['Target'] = df['Target'].apply(lambda x: 0 if x == 'No' else 1)
+
+    if df_name == 'term_deposit_subscription':
+      df['Target'] = df['Target'].apply(lambda x: 0 if x == 'no' else 1)
+
+    if df_name == 'Car Ownership':
+      df['Target'] = df['Target'].apply(lambda x: 0 if x == 'No' else 1)
 
     # Change column names
     df.columns = list(map(change_column_name,df.columns))
