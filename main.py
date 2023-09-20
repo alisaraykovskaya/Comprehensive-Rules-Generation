@@ -5,6 +5,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from copy import deepcopy
 
+
+dataset_names = [
+    "heart",
+    "DivideBy30RemainderNull"
+]
+
 config = {
     "load_data_params":{
         "project_name": "heart", 
@@ -24,8 +30,8 @@ config = {
         "excessive_models_num_coef": 3, # used for computing cropping threshold in workers
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
-        "crop_features": 1000, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
-        "crop_parent_features": 1000,
+        "crop_features": 5000, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_parent_features": 5000,
 
         "complexity_restr_operators": None, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
@@ -57,31 +63,33 @@ already_splitted_datasets = set(["dont_overfit", "AirlinePassangerSatisfaction"]
 
 
 def main():
-    print('LOADING DATA...')
-    df = LoadData(**config["load_data_params"])
-    if config["load_data_params"]["project_name"] in already_splitted_datasets:
-        y_train = df['Target']
-        X_train = df.drop('Target', axis=1)
-        df_test_config = deepcopy(config["load_data_params"])
-        df_test_config["project_name"] += "_test"
-        X_test = LoadData(**df_test_config)
-        y_test = X_test['Target']
-        X_test.drop('Target', axis=1, inplace=True)
-    else:
-        y_true = df['Target']
-        df.drop('Target', axis=1, inplace=True)
-        X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=y_true, random_state=12)
+    for dataset_name in dataset_names:
+        config["load_data_params"]["project_name"] = dataset_name
+        print('LOADING DATA...')
+        df = LoadData(**config["load_data_params"])
+        if config["load_data_params"]["project_name"] in already_splitted_datasets:
+            y_train = df['Target']
+            X_train = df.drop('Target', axis=1)
+            df_test_config = deepcopy(config["load_data_params"])
+            df_test_config["project_name"] += "_test"
+            X_test = LoadData(**df_test_config)
+            y_test = X_test['Target']
+            X_test.drop('Target', axis=1, inplace=True)
+        else:
+            y_true = df['Target']
+            df.drop('Target', axis=1, inplace=True)
+            X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=y_true, random_state=12)
 
-    binarizer = Binarizer(**config["load_data_params"], **config["binarizer_params"])
-    crg_alg = CRG(binarizer, **config["load_data_params"], **config["rules_generation_params"], **config["similarity_filtering_params"])
+        binarizer = Binarizer(**config["load_data_params"], **config["binarizer_params"])
+        crg_alg = CRG(binarizer, **config["load_data_params"], **config["rules_generation_params"], **config["similarity_filtering_params"])
 
-    crg_alg.fit(X_train, y_train)
-    # for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
-    #     print(f'subset_size={subset_size}')
-    #     preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
-    #     print(classification_report(y_test, preds))
+        crg_alg.fit(X_train, y_train)
+        # for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
+        #     print(f'subset_size={subset_size}')
+        #     preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
+        #     print(classification_report(y_test, preds))
 
-    crg_alg.predict(raw_df_test=X_test, y_test=y_test, subset_size=config['rules_generation_params']['subset_size'], incremental=True)
+        crg_alg.predict(raw_df_test=X_test, y_test=y_test, subset_size=config['rules_generation_params']['subset_size'], incremental=True)
 
 
 

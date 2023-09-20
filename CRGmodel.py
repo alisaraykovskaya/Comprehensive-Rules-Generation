@@ -183,7 +183,7 @@ class CRG:
         result = []
         variables = list(map(chr, range(122, 122-subset_size,-1)))
         for current_size in range(1, subset_size+1):
-            models = self.best_models_dict[subset_size]
+            models = self.best_models_dict[current_size]
             for model_info in models:
                 columns = model_info['columns']
                 nan_mask = np.full_like(df_test.shape[0], True, dtype=bool)
@@ -195,7 +195,7 @@ class CRG:
                 df_np_cols = np.array(df_np_cols)
                 df_nan_cols = np.array(df_nan_cols)
                 local_dict = {}
-                for i in range(len(variables)):
+                for i in range(current_size):
                     local_dict[variables[i]] = df_np_cols[i]
                 expr = model_info['expr']
                 result = ne.evaluate(expr, local_dict=local_dict)
