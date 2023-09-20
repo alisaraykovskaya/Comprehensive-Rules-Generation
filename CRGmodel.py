@@ -173,8 +173,65 @@ class CRG:
                     print(f'\nNumber of features is croped by {self.crop_features}')
                 self.df = self.df[self.columns_ordered]
 
+
+    def predict(self, raw_df_test, y_test, subset_size=1, incremental=False):
+        print('BINARIZING TEST DATA...')
+        df_test = self.binarizer.transform(raw_df_test)
+        df_test_dict = {}
+        for col in df_test.columns:
+            df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
+        result = []
+        variables = list(map(chr, range(122, 122-subset_size,-1)))
+        for current_size in range(1, subset_size+1):
+            models = self.best_models_dict[subset_size]
+            for model_info in models:
+                columns = model_info['columns']
+                nan_mask = np.full_like(df_test.shape[0], True, dtype=bool)
+                df_np_cols = []
+                df_nan_cols = []
+                for col in columns:
+                    df_np_cols.append(df_test_dict[col]['data'])
+                    df_nan_cols.append(df_test_dict[col]['nan_mask'])
+                df_np_cols = np.array(df_np_cols)
+                df_nan_cols = np.array(df_nan_cols)
+                local_dict = {}
+                for i in range(len(variables)):
+                    local_dict[variables[i]] = df_np_cols[i]
+                expr = model_info['expr']
+                result = ne.evaluate(expr, local_dict=local_dict)
+                # result = apply_nan_mask_list(result, nan_mask)
+                tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
+                precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
+                precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
+                recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
+                f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
+
+                model_info["test_f1_1"] = f1
+                model_info["test_f1_0"] = f1_0
+                model_info["test_precision_1"] = precision
+                model_info["test_precision_0"] = precision_0
+                model_info["test_recall_1"] = recall
+                model_info["test_recall_0"] = recall_0
+                model_info["test_rocauc"] = rocauc
+                model_info["test_accuracy"] = accuracy
+
+            models_to_excel = list_to_df(models)
+            models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
+            beautify_simple(models_to_excel)
+            beautify_summed(models_to_excel, current_size, variables)
+
+            models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
+                'test_f1_1', 'test_precision_1', 'test_recall_1', 'test_rocauc', 'test_accuracy', 'elapsed_time', 'columns', 'summed_expr', \
+                'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+            models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1', 'test_precision_1': 'test_precision', \
+                                            'test_recall_1': 'test_recall', 'test_f1_1': 'test_f1'}, inplace=True)
+
+            with pd.ExcelWriter(f"./Output/{self.project_name}_BestModels.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+                models_to_excel.to_excel(writer, sheet_name=f'Size {current_size}', index=False, freeze_panes=(1,1))
+
+
     
-    def predict(self, raw_df_test, y_test=None, subset_size=1, k_best=1, incremental=False):
+    def ensemble_predict(self, raw_df_test, y_test=None, subset_size=1, k_best=1, incremental=False):
         print('BINARIZING TEST DATA...')
         df_test = self.binarizer.transform(raw_df_test)
         df_test_dict = {}
@@ -387,7 +444,7 @@ class CRG:
 
     def find_best_models(self, is_onevar):
         excel_exist = False
-        if path.exists(f"./Output/BestModels_{self.project_name}_train.xlsx"):
+        if path.exists(f"./Output/{self.project_name}_BestModels.xlsx"):
             excel_exist = True
 
         if is_onevar:
@@ -530,10 +587,10 @@ class CRG:
                 models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
                 if excel_exist:
-                    with pd.ExcelWriter(f"./Output/BestModels_{self.project_name}_train.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+                    with pd.ExcelWriter(f"./Output/{self.project_name}_BestModels.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
                         models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
                 else:
-                    models_to_excel.to_excel(f"./Output/BestModels_{self.project_name}_train.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
+                    models_to_excel.to_excel(f"./Output/{self.project_name}_BestModels.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
                     excel_exist = True
 
                 # print('wrote models to excel')
@@ -556,8 +613,8 @@ class CRG:
     def log_exec(self, subset_size, elapsed_time, rows_num, cols_num):
         now = datetime.now()
         now = now.strftime("%Y-%m-%d %H:%M:%S")
-        if path.exists("./Output/log.xlsx"):
-            log = pd.read_excel('./Output/log.xlsx')
+        if path.exists(f"./Output/{self.project_name}_log.xlsx"):
+            log = pd.read_excel(f"./Output/{self.project_name}_log.xlsx")
             # search_idx = log.loc[(log['dataset'] == self.project_name) & (log['sim_metric'] == self.sim_metric) & \
             #     (log['subset_size'] == subset_size) & (log['rows_num'] == rows_num) & (log['cols_num'] == cols_num) & \
             #     (log['process_number'] == self.process_number) & (log['batch_size'] == self.batch_size) & \
@@ -604,7 +661,7 @@ class CRG:
                                             'time_restriction_seconds': [self.time_restriction_seconds]
                                             })
                 log = pd.concat([log, new_row], ignore_index=True)
-                with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
+                with pd.ExcelWriter(f"./Output/{self.project_name}_log.xlsx", mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))
         else:
             log = pd.DataFrame(data={
@@ -627,5 +684,5 @@ class CRG:
                                      'complexity_restr_vars': [self.complexity_restr_vars],
                                      'time_restriction_seconds': [self.time_restriction_seconds]
                                      })
-            with pd.ExcelWriter('./Output/log.xlsx', mode="w", engine="openpyxl") as writer:
+            with pd.ExcelWriter(f"./Output/{self.project_name}_log.xlsx", mode="w", engine="openpyxl") as writer:
                     log.to_excel(writer, sheet_name='Logs', index=False, freeze_panes=(1,1))

@@ -7,13 +7,13 @@ from copy import deepcopy
 
 config = {
     "load_data_params":{
-        "project_name": "patient_survival_prediction", 
+        "project_name": "heart", 
         "load_from_pkl": False
     },
 
     "rules_generation_params": {
         "quality_metric": "f1", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 4, # number of variables for boolean formula in models
+        "subset_size": 3, # number of variables for boolean formula in models
 
         "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload. number_of_models = batch_size * formula_number
@@ -24,13 +24,13 @@ config = {
         "excessive_models_num_coef": 3, # used for computing cropping threshold in workers
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
-        "crop_features": 250, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
-        "crop_parent_features": 20,
+        "crop_features": 1000, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_parent_features": 1000,
 
         "complexity_restr_operators": None, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
 
-        "time_restriction_seconds": 5000, # Limiting the running time of the algorithm per subset_size
+        "time_restriction_seconds": 500000, # Limiting the running time of the algorithm per subset_size
 
         "incremental_run": True, # run algorithm on subset_size=1...subset_size
         "crop_features_after_size": 1, # if crop_features and incremental_run, then cropping will occur after subset_size
@@ -44,7 +44,7 @@ config = {
   
     "binarizer_params": {
         "unique_threshold": 20, # maximal number of unique values to consider numerical variable as category
-        "q": 20, # number of quantiles to split numerical variable, can be lowered if there is need in speed
+        "q": 5, # number of quantiles to split numerical variable, can be lowered if there is need in speed
         "exceptions_threshold": 0.01, # max % of exeptions allowed while converting a variable into numeric to treat it as numeric 
         "numerical_binarization": "range", # "range" "threshold"
         "nan_threshold": 0.9, # max % of missing values allowed to process the variable
@@ -76,12 +76,12 @@ def main():
     crg_alg = CRG(binarizer, **config["load_data_params"], **config["rules_generation_params"], **config["similarity_filtering_params"])
 
     crg_alg.fit(X_train, y_train)
-    for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
-        print(f'subset_size={subset_size}')
-        preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
-        print(classification_report(y_test, preds))
+    # for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
+    #     print(f'subset_size={subset_size}')
+    #     preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
+    #     print(classification_report(y_test, preds))
 
-    # crg_alg.predict(raw_df_test=X_test, y_test=y_test, subset_size=config['rules_generation_params']['subset_size'], k_best=5, incremental=True)
+    crg_alg.predict(raw_df_test=X_test, y_test=y_test, subset_size=config['rules_generation_params']['subset_size'], incremental=True)
 
 
 

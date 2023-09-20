@@ -266,6 +266,21 @@ def LoadData(project_name, load_from_pkl=False):
       df['Target'] = df['Target'].apply(lambda x: 0 if x == 'no' else 1)
 
     if df_name == 'Car Ownership':
+      def leave_only_num(s):
+        new_s = []
+        if s is np.nan or s is None:
+          return s
+        for i in s:
+          if i.isnumeric():
+            new_s.append(i)
+          elif i == "k":
+            new_s.append("000")
+        if len(new_s) == 0:
+          return np.nan
+        return int("".join(new_s))
+      df["Monthly Income"] = df["Monthly Income"].apply(lambda x: leave_only_num(x))
+      df["Years of Employment"] = df["Years of Employment"].apply(lambda x: leave_only_num(x))
+      df["Number of Children"] = df["Number of Children"].apply(lambda x: leave_only_num(x))
       df['Target'] = df['Target'].apply(lambda x: 0 if x == 'No' else 1)
 
     # Change column names
