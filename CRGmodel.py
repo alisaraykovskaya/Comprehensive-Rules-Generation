@@ -24,6 +24,7 @@ from numba import njit
 
 from utils import model_string_gen, simplify_expr, find_sum, sums_generator, similarity_filtering, list_to_df, post_simplify, beautify_simple, beautify_summed
 from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string, get_readable_size
+from utils import custom_eval
 from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
 from metrics_utils import negate_model
 from best_models import make_nan_mask, apply_nan_mask_list
@@ -182,6 +183,7 @@ class CRG:
             df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
         result = []
         variables = list(map(chr, range(122, 122-subset_size,-1)))
+        test_df_len = len(df_test)
         for current_size in range(1, subset_size+1):
             models = self.best_models_dict[subset_size]
             for model_info in models:
@@ -198,7 +200,8 @@ class CRG:
                 for i in range(len(variables)):
                     local_dict[variables[i]] = df_np_cols[i]
                 expr = model_info['expr']
-                result = ne.evaluate(expr, local_dict=local_dict)
+                result = custom_eval(expr, local_dict, test_df_len)
+                #result = ne.evaluate(expr, local_dict=local_dict)
                 # result = apply_nan_mask_list(result, nan_mask)
                 tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
                 precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
@@ -239,6 +242,7 @@ class CRG:
             df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
         result = []
         variables = list(map(chr, range(122, 122-subset_size,-1)))
+        test_df_len = len(df_test)
         if not incremental:
             if isinstance(k_best, int):
                 if subset_size not in self.best_models_dict:
@@ -259,7 +263,8 @@ class CRG:
                     for i in range(len(variables)):
                         local_dict[variables[i]] = df_np_cols[i]
                     expr = model_dict['expr']
-                    tmp = ne.evaluate(expr, local_dict=local_dict)
+                    result = custom_eval(expr, local_dict, test_df_len)
+                    #tmp = ne.evaluate(expr, local_dict=local_dict)
                     result.append(tmp)
                 result = np.stack(result, axis=-1)
                 print(result.shape)
@@ -294,7 +299,8 @@ class CRG:
                         df_nan_cols = np.array(df_nan_cols)
                         nan_mask = make_nan_mask(nan_mask, df_nan_cols, curent_size)
                         expr = model_dict['expr']
-                        tmp = ne.evaluate(expr, local_dict=local_dict)
+                        tmp = custom_eval(expr, local_dict, test_df_len)
+                        #tmp = ne.evaluate(expr, local_dict=local_dict)
                         result.append(tmp)
                     result = np.stack(result, axis=-1)
                     result = np.rint(np.mean(result, axis=1)).astype(float)
@@ -336,6 +342,7 @@ class CRG:
             crop_number_in_workers = self.crop_number_in_workers
         best_models = []
         count = 0
+        df_len = len(self.df)
         for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
@@ -352,7 +359,8 @@ class CRG:
                 formula = formula_dict['formula']
                 summed_formula = formula_dict['summed_formula']
                 readable_formula = formula_dict['readable_formula']
-                result = ne.evaluate(formula, local_dict=local_dict)
+                result = custom_eval(formula, local_dict, df_len)
+                #result = ne.evaluate(formula, local_dict=local_dict)
                 result = apply_nan_mask_list(result, nan_mask)
 
                 tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
