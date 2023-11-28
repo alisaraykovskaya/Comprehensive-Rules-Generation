@@ -48,10 +48,10 @@ def LoadData(project_name, load_from_pkl=False):
       target_name = "Survived"
       file_ext = "csv" 
 
-    elif project_name == "heart":
-      df_name = "heart"
-      target_name = "HeartDisease"
-      file_ext = "csv" 
+    # elif project_name == "heart":
+    #   df_name = "heart"
+    #   target_name = "HeartDisease"
+    #   file_ext = "csv" 
 
     elif project_name == "ApptsAnon":
       df_name = "Missed_Pedi_Appts_v4.Anon"
@@ -151,6 +151,57 @@ def LoadData(project_name, load_from_pkl=False):
     elif project_name == "patient_survival_prediction":
       df_name = "patient_survival_prediction"
       target_name = "hospital_death"
+      file_ext = "csv"
+######################## Datasets for a paper #############################
+###### Train Data #############
+    elif project_name == "heart_train":
+      df_name = "Train/heart_train"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "bank_train":
+      df_name = "Train/bank_train"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "churn_train":
+      df_name = "Train/churn_train"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "diabetes_train":
+      df_name = "Train/diabetes_train"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "hepatitis_train":
+      df_name = "Train/hepatitis_train"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "heart_test":
+      df_name = "Test/heart_test"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "bank_test":
+      df_name = "Test/bank_test"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "churn_test":
+      df_name = "Test/churn_test"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "diabetes_test":
+      df_name = "Test/diabetes_test"
+      target_name = "Target"
+      file_ext = "csv"
+
+    elif project_name == "hepatitis_test":
+      df_name = "Test/hepatitis_test"
+      target_name = "Target"
       file_ext = "csv"
 
     else:

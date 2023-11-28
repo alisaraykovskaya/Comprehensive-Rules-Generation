@@ -8,10 +8,10 @@ from copy import deepcopy
 import operator
 from datetime import datetime
 import itertools
-import psutil
-from memory_profiler import profile
-import sys
-import gc
+# import psutil
+# from memory_profiler import profile
+# import sys
+# import gc
 import numexpr as ne
 
 import pandas as pd
@@ -27,6 +27,7 @@ from utils import get_1var_importance_order, get_feature_importance, add_missing
 from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
 from metrics_utils import negate_model
 from best_models import make_nan_mask, apply_nan_mask_list
+from utils import custom_eval, custom_eval2
 
 
 class CRG:
@@ -48,6 +49,7 @@ class CRG:
         crop_parent_features=20,
         complexity_restr_operators=None,
         complexity_restr_vars=None,
+        restrict_complexity_after_size=1,
         time_restriction_seconds=None,
         incremental_run=True,
         crop_features_after_size=1,
@@ -71,6 +73,7 @@ class CRG:
         self.crop_parent_features = crop_parent_features
         self.complexity_restr_operators=complexity_restr_operators
         self.complexity_restr_vars=complexity_restr_vars
+        self.restrict_complexity_after_size=restrict_complexity_after_size
         self.time_restriction_seconds = time_restriction_seconds
         self.incremental_run = incremental_run
         self.crop_features_after_size = crop_features_after_size
@@ -182,6 +185,7 @@ class CRG:
             df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
         result = []
         variables = list(map(chr, range(122, 122-subset_size,-1)))
+        test_df_len = len(df_test)
         for current_size in range(1, subset_size+1):
             models = self.best_models_dict[current_size]
             for model_info in models:
@@ -198,7 +202,9 @@ class CRG:
                 for i in range(current_size):
                     local_dict[variables[i]] = df_np_cols[i]
                 expr = model_info['expr']
-                result = ne.evaluate(expr, local_dict=local_dict)
+                # result = ne.evaluate(expr, local_dict=local_dict)
+                result = custom_eval(expr, local_dict, test_df_len)
+                # result = custom_eval2(expr, local_dict, test_df_len)
                 # result = apply_nan_mask_list(result, nan_mask)
                 tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
                 precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
@@ -239,6 +245,7 @@ class CRG:
             df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
         result = []
         variables = list(map(chr, range(122, 122-subset_size,-1)))
+        test_df_len = len(df_test)
         if not incremental:
             if isinstance(k_best, int):
                 if subset_size not in self.best_models_dict:
@@ -259,7 +266,9 @@ class CRG:
                     for i in range(len(variables)):
                         local_dict[variables[i]] = df_np_cols[i]
                     expr = model_dict['expr']
-                    tmp = ne.evaluate(expr, local_dict=local_dict)
+                    # tmp = ne.evaluate(expr, local_dict=local_dict)
+                    tmp = custom_eval(expr, local_dict, test_df_len)
+                    # tmp = custom_eval2(expr, local_dict, test_df_len)
                     result.append(tmp)
                 result = np.stack(result, axis=-1)
                 print(result.shape)
@@ -294,7 +303,9 @@ class CRG:
                         df_nan_cols = np.array(df_nan_cols)
                         nan_mask = make_nan_mask(nan_mask, df_nan_cols, curent_size)
                         expr = model_dict['expr']
-                        tmp = ne.evaluate(expr, local_dict=local_dict)
+                        # tmp = ne.evaluate(expr, local_dict=local_dict)
+                        tmp = custom_eval(expr, local_dict, test_df_len)
+                        # tmp = custom_eval2(expr, local_dict, test_df_len)
                         result.append(tmp)
                     result = np.stack(result, axis=-1)
                     result = np.rint(np.mean(result, axis=1)).astype(float)
@@ -336,6 +347,7 @@ class CRG:
             crop_number_in_workers = self.crop_number_in_workers
         best_models = []
         count = 0
+        df_len = len(self.df)
         for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
@@ -352,7 +364,9 @@ class CRG:
                 formula = formula_dict['formula']
                 summed_formula = formula_dict['summed_formula']
                 readable_formula = formula_dict['readable_formula']
-                result = ne.evaluate(formula, local_dict=local_dict)
+                # result = ne.evaluate(formula, local_dict=local_dict)
+                result = custom_eval(formula, local_dict, df_len)
+                # result = custom_eval2(formula, local_dict, df_len)
                 result = apply_nan_mask_list(result, nan_mask)
 
                 tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
@@ -484,6 +498,7 @@ class CRG:
             self.y_true = self.y_true.values.astype(float)
 
         self.all_formulas = []
+        all_formulas_number = 0
         for expr, output in model_string_gen(subset_size, variables):
             simple_expr = simplify_expr(expr, subset_size, variables, algebra)
             # If formula is a tautology
@@ -493,11 +508,14 @@ class CRG:
             if actual_subset_size < subset_size:
                 continue
             number_of_binary_operators = count_operators(simple_expr)
-            max_freq_of_variables = count_vars(simple_expr) 
-            if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
-                continue
-            if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
-                continue
+            max_freq_of_variables = count_vars(simple_expr)
+            if self.restrict_complexity_after_size < subset_size:
+                if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
+                    all_formulas_number += 1
+                    continue
+                if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
+                    all_formulas_number += 1
+                    continue
 
             summed_expr = find_sum(sums_generator(subset_size), simple_expr)
 
@@ -529,8 +547,11 @@ class CRG:
                 'neg_max_freq_of_variables': neg_max_freq_of_variables
             })
         formulas_number = len(self.all_formulas)
+        all_formulas_number += formulas_number
         total_model_count = formulas_number * subset_number
         print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_model_count}')
+        if self.restrict_complexity_after_size < subset_size:
+            print(f'formulas_number (without restriction): {all_formulas_number}')
 
         if self.process_number > 1:
             worker_timer = time()

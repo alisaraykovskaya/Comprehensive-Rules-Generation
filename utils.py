@@ -3,10 +3,66 @@ from itertools import product, combinations
 import os.path
 import copy
 from math import factorial
-import operator 
+import operator
+import re
+import numpy as np
 
 from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
+
+
+def custom_eval(formula: str, local_dict: dict, df_len: int) -> np.array:
+    CNFS_list = formula.split('|')
+    result = np.zeros(df_len, dtype=bool)
+    for CNF in CNFS_list:
+        tmp_vars = re.findall(r'[a-z~]', CNF)
+        tmp_result = np.ones(df_len, dtype=bool)
+        tilda = False
+        for tmp_var in tmp_vars:
+            if tmp_var=='~':
+                tilda = True
+                pass
+
+            else:
+                if tilda:
+                    tmp_result &= ~local_dict[tmp_var]
+                else:
+                    tmp_result &= local_dict[tmp_var]
+                tilda = False
+        result |= tmp_result
+    return result
+
+
+def custom_eval2(formula: str, local_dict: dict, df_len: int) -> np.array:
+    CNFS_list = formula.split('|')
+    result = np.zeros(df_len, dtype=bool)
+
+    for CNF in CNFS_list:
+        i = 0
+        tmp_result = np.ones(df_len, dtype=bool)
+
+        while i < len(CNF):
+            if CNF[i] == '~':
+                negation = True
+                i += 1
+            else:
+                negation = False
+
+            if CNF[i].isalpha():  # Check if it is a variable character
+                var = CNF[i]
+                if negation:
+                    tmp_result &= ~local_dict[var]
+                else:
+                    tmp_result &= local_dict[var]
+                i += 1
+
+            # Skip any non-variable characters like '&', '|', '(', ')'
+            while i < len(CNF) and not CNF[i].isalpha():
+                i += 1
+
+        result |= tmp_result
+
+    return result
 
 
 def get_1var_importance_order(best_models, subset_size, columns_number, parent_features_dict):
