@@ -11,6 +11,61 @@ from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
 
 
+def get_best_bool_func(features, target):
+    n_features = features.shape[1]
+    n_combinations = 2 ** n_features
+    bool_func = np.zeros(n_combinations, dtype=int)
+    values_counter = np.zeros(n_combinations, dtype=int)
+
+    indices = np.dot(features, 2**np.arange(n_features)[::-1])
+
+    for idx in range(len(indices)):
+        if target[idx] == 1:
+            values_counter[indices[idx]] += 1
+
+    for i in range(n_combinations):
+        if values_counter[i] >= len(features) // 2:
+            bool_func[i] = 1
+
+    return bool_func
+
+
+# def get_best_bool_func(features, target):
+#     n_features = features.shape[1]
+#     n_combinations = 2 ** n_features
+#     bool_func = np.zeros(n_combinations, dtype=int)
+#     values_counter = np.zeros(n_combinations, dtype=int)
+
+#     # Calculate class weights
+#     class_weights = {
+#         0: np.sum(target == 0) / len(target),
+#         1: np.sum(target == 1) / len(target)
+#     }
+
+#     # Convert rows to binary numbers
+#     indices = np.dot(features, 2**np.arange(n_features)[::-1])
+
+#     # Count weighted occurrences of 1s for each combination
+#     for idx in range(len(indices)):
+#         values_counter[indices[idx]] += class_weights[1] if target[idx] == 1 else class_weights[0]
+
+#     # Adjusted threshold (this can be tuned)
+#     threshold = len(features) * class_weights[1]
+
+#     # Determine the boolean function
+#     for i in range(n_combinations):
+#         if values_counter[i] >= threshold:
+#             bool_func[i] = 1
+
+#     return bool_func
+
+
+def apply_bool_func(features, bool_func):
+    n_features = features.shape[1]
+    indices = np.dot(features, 2**np.arange(n_features)[::-1])
+    return bool_func[indices]
+
+
 def custom_eval(formula: str, local_dict: dict, df_len: int) -> np.array:
     CNFS_list = formula.split('|')
     result = np.zeros(df_len, dtype=bool)
@@ -306,9 +361,9 @@ def post_simplify(row, subset_size, variables, algebra):
 
 # @log_sparse
 def beautify_simple(df):
-    df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('~', ' ~'), axis=1)
-    df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('&', ' & '), axis=1)
-    df['simple_formula'] = df.apply(lambda x: x['simple_formula'].replace('|', ' | '), axis=1)
+    df['readable_formula'] = df.apply(lambda x: x['readable_formula'].replace('~', ' ~'), axis=1)
+    df['readable_formula'] = df.apply(lambda x: x['readable_formula'].replace('&', ' & '), axis=1)
+    df['readable_formula'] = df.apply(lambda x: x['readable_formula'].replace('|', ' | '), axis=1)
 
 
 # @log_sparse

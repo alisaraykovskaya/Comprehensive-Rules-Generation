@@ -27,7 +27,7 @@ from utils import get_1var_importance_order, get_feature_importance, add_missing
 from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
 from metrics_utils import negate_model
 from best_models import make_nan_mask, apply_nan_mask_list
-from utils import custom_eval, custom_eval2
+from utils import custom_eval, custom_eval2, get_best_bool_func, apply_bool_func
 
 
 class CRG:
@@ -120,9 +120,9 @@ class CRG:
         self.df = self.binarizer.fit_transform(self.raw_df)
         self.parent_features_dict = self.binarizer.parent_features_dict
 
+        # using only fraction of dataset
         if self.dataset_frac != 1:
             self.df, _ = train_test_split(self.df, train_size=self.dataset_frac, stratify=self.df['Target'], random_state=12)
-        # print(self.df)
         self.y_true = self.df['Target']
         self.df = self.df.drop(columns=['Target'])
         self.columns_ordered = self.df.columns
@@ -190,22 +190,18 @@ class CRG:
             models = self.best_models_dict[current_size]
             for model_info in models:
                 columns = model_info['columns']
-                nan_mask = np.full_like(df_test.shape[0], True, dtype=bool)
-                df_np_cols = []
+                nan_mask = np.full_like(self.y_true, True, dtype=bool)
+                features_subset = []
                 df_nan_cols = []
                 for col in columns:
-                    df_np_cols.append(df_test_dict[col]['data'])
+                    features_subset.append(df_test_dict[col]['data'])
                     df_nan_cols.append(df_test_dict[col]['nan_mask'])
-                df_np_cols = np.array(df_np_cols)
+                features_subset = np.column_stack(features_subset)
                 df_nan_cols = np.array(df_nan_cols)
-                local_dict = {}
-                for i in range(current_size):
-                    local_dict[variables[i]] = df_np_cols[i]
-                expr = model_info['expr']
-                # result = ne.evaluate(expr, local_dict=local_dict)
-                result = custom_eval(expr, local_dict, test_df_len)
-                # result = custom_eval2(expr, local_dict, test_df_len)
-                # result = apply_nan_mask_list(result, nan_mask)
+                nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
+                bool_func = model_info['bool_func']
+                result = apply_bool_func(features_subset, bool_func)
+                result = apply_nan_mask_list(result, nan_mask)
                 tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
                 precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
                 precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
@@ -221,19 +217,20 @@ class CRG:
                 model_info["test_rocauc"] = rocauc
                 model_info["test_accuracy"] = accuracy
 
-            models_to_excel = list_to_df(models)
-            models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
-            beautify_simple(models_to_excel)
-            beautify_summed(models_to_excel, current_size, variables)
+            if len(models) > 0:
+                models_to_excel = list_to_df(models)
+                models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
+                beautify_simple(models_to_excel)
+                beautify_summed(models_to_excel, current_size, variables)
 
-            models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
-                'test_f1_1', 'test_precision_1', 'test_recall_1', 'test_rocauc', 'test_accuracy', 'elapsed_time', 'columns', 'summed_expr', \
-                'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
-            models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1', 'test_precision_1': 'test_precision', \
-                                            'test_recall_1': 'test_recall', 'test_f1_1': 'test_f1'}, inplace=True)
+                models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
+                    'test_f1_1', 'test_precision_1', 'test_recall_1', 'test_rocauc', 'test_accuracy', 'elapsed_time', 'columns', 'summed_expr', \
+                    'readable_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+                models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1', 'test_precision_1': 'test_precision', \
+                                                'test_recall_1': 'test_recall', 'test_f1_1': 'test_f1'}, inplace=True)
 
-            with pd.ExcelWriter(f"./Output/{self.project_name}_BestModels.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
-                models_to_excel.to_excel(writer, sheet_name=f'Size {current_size}', index=False, freeze_panes=(1,1))
+                with pd.ExcelWriter(f"./Output/{self.project_name}_BestModels.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+                    models_to_excel.to_excel(writer, sheet_name=f'Size {current_size}', index=False, freeze_panes=(1,1))
 
 
     
@@ -348,111 +345,77 @@ class CRG:
         best_models = []
         count = 0
         df_len = len(self.df)
+        algebra = boolean.BooleanAlgebra()
         for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
-            local_dict = {}
+            features_subset = []
             df_nan_cols = []
             for i in range(subset_size):
-                local_dict[variables[i]] = self.df_dict[columns[i]]['data']
+                features_subset.append(self.df_dict[columns[i]]['data'])
                 df_nan_cols.append(self.df_dict[columns[i]]['nan_mask'])
+            features_subset = np.column_stack(features_subset)
             df_nan_cols = np.array(df_nan_cols)
             nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
             nan_count = np.count_nonzero(nan_mask)
+            bool_func = get_best_bool_func(features_subset, self.y_true)
+            result = apply_bool_func(features_subset, bool_func)
+            result = apply_nan_mask_list(result, nan_mask)
+            tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
+            precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
 
-            for formula_dict in self.all_formulas:
-                formula = formula_dict['formula']
-                summed_formula = formula_dict['summed_formula']
-                readable_formula = formula_dict['readable_formula']
-                # result = ne.evaluate(formula, local_dict=local_dict)
-                result = custom_eval(formula, local_dict, df_len)
-                # result = custom_eval2(formula, local_dict, df_len)
-                result = apply_nan_mask_list(result, nan_mask)
+            if self.quality_metric == 'f1_1':
+                quality = f1
+            elif self.quality_metric == 'precision_1':
+                quality = precision
+            elif self.quality_metric == 'recall_1':
+                quality = recall
+            elif self.quality_metric == 'rocauc':
+                quality = rocauc
+            elif self.quality_metric == 'accuracy':
+                quality = accuracy
 
-                tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
-                precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
-
-                if self.quality_metric == 'f1_1':
-                    quality = f1
-                elif self.quality_metric == 'precision_1':
-                    quality = precision
-                elif self.quality_metric == 'recall_1':
-                    quality = recall
-                elif self.quality_metric == 'rocauc':
-                    quality = rocauc
-                elif self.quality_metric == 'accuracy':
-                    quality = accuracy
-
-                if quality > min_quality:
-                    precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
-                    recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
-                    f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
-                    columns_set = get_parent_set(columns)
-                    elapsed_time = time() - self.start_time
-                    for i in range(subset_size):
-                        readable_formula = readable_formula.replace(f"var[{i}]", columns[i])
-                    model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
-                        'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
-                        'summed_expr': summed_formula, 'columns': columns, 'expr': formula, 'expr_len': len(formula), 'is_negated': 'False',  'simple_formula': readable_formula, 'columns_set': columns_set, \
-                        'number_of_binary_operators': formula_dict['number_of_binary_operators'], 'max_freq_of_variables': formula_dict['max_freq_of_variables']}
-                    if self.sim_metric == 'JAC_SCORE':
-                        model_info['result'] = negate_model(result)
-                    else:
-                        model_info['result'] = None
-                    best_models.append(model_info)
-                # checking negated model
-                formula = formula_dict['neg_formula']
-                summed_formula = formula_dict['neg_summed_formula']
-                readable_formula = formula_dict['neg_readable_formula']
-
+            if quality > min_quality:
                 precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
-                precision_neg, recall_neg, f1_neg, rocauc_neg, accuracy_neg = calculate_metrics_for_negation(recall, fpr, accuracy, precision_0)
+                recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
+                f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
+                columns_set = get_parent_set(columns)
+                elapsed_time = time() - self.start_time
+                dnf_formula = outputs_to_model_string(bool_func, subset_size, variables)
+                simple_formula = simplify_expr(dnf_formula, subset_size, variables, algebra)
+                actual_subset_size = count_actual_subset_size(simple_formula)
+                if actual_subset_size < subset_size:
+                    continue
+                number_of_binary_operators = count_operators(simple_formula)
+                max_freq_of_variables = count_vars(simple_formula)
+                if self.restrict_complexity_after_size < subset_size:
+                    if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
+                        all_formulas_number += 1
+                        continue
+                    if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
+                        all_formulas_number += 1
+                        continue
 
-                if self.quality_metric == 'f1_1':
-                    quality = f1_neg
-                elif self.quality_metric == 'precision_1':
-                    quality = precision_neg
-                elif self.quality_metric == 'recall_1':
-                    quality = recall_neg
-                elif self.quality_metric == 'rocauc':
-                    quality = rocauc_neg
-                elif self.quality_metric == 'accuracy':
-                    quality = accuracy_neg
-                if quality > min_quality:
-                    precision_0 = 1 - precision
-                    recall_0 = recall
-                    f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
-                    columns_set = get_parent_set(columns)
-                    elapsed_time = time() - self.start_time
-                    for i in range(subset_size):
-                        readable_formula = readable_formula.replace(f"var[{i}]", columns[i])
-                    model_info = {'f1_1': f1_neg, 'f1_0': f1_0, 'tn': fp, 'fp': tn, 'fn': tp, 'tp': fn, 'precision_1': precision_neg, 'precision_0': precision_0,\
-                        'recall_1': recall_neg, 'recall_0': recall_0, 'rocauc': rocauc_neg, 'accuracy': accuracy_neg, 'elapsed_time': elapsed_time, 'nan_ratio': nan_count/self.y_true.shape[0], \
-                        'summed_expr': summed_formula, 'columns': columns, 'expr': formula, 'expr_len': len(formula), 'is_negated': 'True', 'simple_formula': readable_formula, 'columns_set': columns_set, \
-                        'number_of_binary_operators': formula_dict['neg_number_of_binary_operators'], 'max_freq_of_variables': formula_dict['neg_max_freq_of_variables']}
-                    if self.sim_metric == 'JAC_SCORE':
-                        model_info['result'] = result
-                    else:
-                        model_info['result'] = None
-                    best_models.append(model_info)
-                
-                # count += 1
-                # if count % 100 == 0:
-                #     gc.collect()
-                #     for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(locals().items())), key= lambda x: -x[1])[:10]:
-                #         print(f"{current_process().name}: {name}: {get_readable_size(size)}")
-
-                if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * self.excessive_models_num_coef:
-                    # for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(locals().items())), key= lambda x: -x[1])[:10]:
-                    #     print(f"{current_process().name}: {name}: {get_readable_size(size)}")
-                    best_models.sort(key=lambda row: (row[self.quality_metric], -row['number_of_binary_operators']), reverse=True)
-                    best_models = best_models[:crop_number_in_workers]
+                summed_formula = find_sum(sums_generator(subset_size), simple_formula)
+                readable_formula = simple_formula
+                for i in range(subset_size):
+                    readable_formula = readable_formula.replace(variables[i], f'var[{i}]')
+                for i in range(subset_size):
+                    readable_formula = readable_formula.replace(f"var[{i}]", columns[i])
+                model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
+                    'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'bool_func': bool_func, \
+                    'summed_expr': summed_formula, 'columns': columns, 'expr': simple_formula, 'expr_len': len(simple_formula), 'readable_formula': readable_formula, 'columns_set': columns_set, \
+                    'number_of_binary_operators': number_of_binary_operators, 'max_freq_of_variables': max_freq_of_variables, 'nan_ratio': nan_count/self.y_true.shape[0],}
+                if self.sim_metric == 'JAC_SCORE':
+                    model_info['result'] = negate_model(result)
+                else:
+                    model_info['result'] = None
+                best_models.append(model_info)
+            if crop_number_in_workers is not None and len(best_models) >= crop_number_in_workers * self.excessive_models_num_coef:
+                best_models.sort(key=lambda row: (row[self.quality_metric], -row['number_of_binary_operators']), reverse=True)
+                best_models = best_models[:crop_number_in_workers]
+                if len(self.best_models) > 0:
                     min_quality = best_models[-1][self.quality_metric]
-                    # for name, size in sorted(((name, sys.getsizeof(value)) for name, value in list(locals().items())), key= lambda x: -x[1])[:10]:
-                    #     print(f"{current_process().name}: {name}: {get_readable_size(size)}")
-                    # gc.collect()
-                
-
         return best_models
 
 
@@ -497,61 +460,7 @@ class CRG:
         if type(self.y_true).__module__ != 'numpy':
             self.y_true = self.y_true.values.astype(float)
 
-        self.all_formulas = []
-        all_formulas_number = 0
-        for expr, output in model_string_gen(subset_size, variables):
-            simple_expr = simplify_expr(expr, subset_size, variables, algebra)
-            # If formula is a tautology
-            if simple_expr == '1':
-                continue
-            actual_subset_size = count_actual_subset_size(simple_expr)
-            if actual_subset_size < subset_size:
-                continue
-            number_of_binary_operators = count_operators(simple_expr)
-            max_freq_of_variables = count_vars(simple_expr)
-            if self.restrict_complexity_after_size < subset_size:
-                if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
-                    all_formulas_number += 1
-                    continue
-                if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
-                    all_formulas_number += 1
-                    continue
-
-            summed_expr = find_sum(sums_generator(subset_size), simple_expr)
-
-            neg_output = tuple(map(operator.not_, output))
-            neg_expr = outputs_to_model_string(neg_output, subset_size, variables)
-            neg_simple_expr = simplify_expr(neg_expr, subset_size, variables, algebra)
-
-            neg_number_of_binary_operators = count_operators(neg_simple_expr)
-            neg_max_freq_of_variables = count_vars(neg_simple_expr)
-
-            neg_summed_expr = find_sum(sums_generator(subset_size), neg_simple_expr)
-            
-            readable_expr = simple_expr
-            neg_readable_expr = neg_simple_expr
-            for i in range(subset_size):
-                readable_expr = readable_expr.replace(variables[i], f'var[{i}]')
-                neg_readable_expr = neg_readable_expr.replace(variables[i], f'var[{i}]')
-
-            self.all_formulas.append({
-                'formula': simple_expr,
-                'summed_formula': summed_expr,
-                'readable_formula': readable_expr,
-                'number_of_binary_operators': number_of_binary_operators,
-                'max_freq_of_variables': max_freq_of_variables,
-                'neg_formula': neg_simple_expr,
-                'neg_summed_formula': neg_summed_expr,
-                'neg_readable_formula': neg_readable_expr,
-                'neg_number_of_binary_operators': neg_number_of_binary_operators,
-                'neg_max_freq_of_variables': neg_max_freq_of_variables
-            })
-        formulas_number = len(self.all_formulas)
-        all_formulas_number += formulas_number
-        total_model_count = formulas_number * subset_number
-        print(f'formulas_number: {formulas_number}  columns_subset_number(models_per_formula): {subset_number}  total_count_of_models: {total_model_count}')
-        if self.restrict_complexity_after_size < subset_size:
-            print(f'formulas_number (without restriction): {all_formulas_number}')
+        print(f'columns_subset_number(total_count_of_models): {subset_number}')
 
         if self.process_number > 1:
             worker_timer = time()
@@ -565,14 +474,15 @@ class CRG:
         current_model_count = 0
         batch = []
         last_reload = False
+        no_models_flag = False
         for subset_index in range(0, subset_number, batch_size):
             if subset_number - subset_index <= batch_size:
                 batch.append((subset_index, subset_number, min_quality, subset_size, variables))
-                current_model_count += (subset_number - subset_index) * formulas_number
+                current_model_count += subset_number - subset_index
                 last_reload = True
             else:
                 batch.append((subset_index, subset_index+batch_size, min_quality, subset_size, variables))
-                current_model_count += batch_size * formulas_number
+                current_model_count += batch_size
             
             if self.time_restriction_seconds is not None and (time() - start_time) > self.time_restriction_seconds:
                 last_reload = True
@@ -593,33 +503,38 @@ class CRG:
                     self.best_models = similarity_filtering(self.best_models, sim_metric, self.min_jac_score, min_same_parents)
                 if crop_number is not None and not last_reload:
                     self.best_models = self.best_models[:crop_number+1]
-                min_quality = self.best_models[-1][self.quality_metric]
+                if len(self.best_models) == 0:
+                    no_models_flag = True
+                else:
+                    min_quality = self.best_models[-1][self.quality_metric]
+                    no_models_flag = False
                 # print('sorted & filtered models')
 
-                models_to_excel = list_to_df(self.best_models)
-                models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
-                # models_to_excel = post_simplify(models_to_excel, subset_size, variables, algebra)
-                # models_to_excel['simple_formula'] = models_to_excel.apply(lambda x: post_simplify(x, subset_size, variables, algebra), axis=1)
-                beautify_simple(models_to_excel)
-                beautify_summed(models_to_excel, subset_size, variables)
+                if not no_models_flag:
+                    models_to_excel = list_to_df(self.best_models)
+                    models_to_excel.drop(['columns_set', 'result'], axis=1, inplace=True)
+                    beautify_simple(models_to_excel)
+                    beautify_summed(models_to_excel, subset_size, variables)
 
-                models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', 'nan_ratio', 'accuracy', \
-                    'elapsed_time', 'columns', 'summed_expr', 'is_negated', 'simple_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
-                models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
+                    models_to_excel = models_to_excel[['tn', 'fp', 'fn', 'tp', 'precision_1', 'recall_1', 'rocauc', 'f1_1', \
+                        'nan_ratio', \
+                        'accuracy', \
+                        'elapsed_time', 'columns', 'summed_expr', 'readable_formula', 'number_of_binary_operators', 'max_freq_of_variables']]
+                    models_to_excel.rename(columns={'precision_1': 'precision', 'recall_1': 'recall', 'f1_1': 'f1'}, inplace=True)
 
-                if excel_exist:
-                    with pd.ExcelWriter(f"./Output/{self.project_name}_BestModels.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
-                        models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
-                else:
-                    models_to_excel.to_excel(f"./Output/{self.project_name}_BestModels.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
-                    excel_exist = True
+                    if excel_exist:
+                        with pd.ExcelWriter(f"./Output/{self.project_name}_BestModels.xlsx", mode="a", if_sheet_exists='replace', engine="openpyxl") as writer:
+                            models_to_excel.to_excel(writer, sheet_name=f'Size {subset_size}', index=False, freeze_panes=(1,1))
+                    else:
+                        models_to_excel.to_excel(f"./Output/{self.project_name}_BestModels.xlsx", index=False, freeze_panes=(1,1), sheet_name=f'Size {subset_size}')
+                        excel_exist = True
 
                 # print('wrote models to excel')
                 
                 batch = []
                 elapsed_time = time() - start_time
                 elapsed_time_per_model = elapsed_time/current_model_count
-                print(f'processed_models: {current_model_count/total_model_count * 100:.1f}%  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(total_model_count - current_model_count) * elapsed_time_per_model:.2f}')
+                print(f'processed_models: {current_model_count/subset_number * 100:.1f}%  elapsed_seconds: {elapsed_time:.2f}  current_quality_threshold: {min_quality:.2f}  estimated_seconds_remaining: {(subset_number - current_model_count) * elapsed_time_per_model:.2f}')
                 if self.time_restriction_seconds is not None and (time() - start_time) > self.time_restriction_seconds:
                     break
         if self.process_number > 1:
@@ -627,6 +542,8 @@ class CRG:
             pool.close()
             pool.join()
             print(f'number of workers terminated: {self.process_number}  time to terminate: {time() - worker_timer}')
+        if len(self.best_models) == 0:
+            print(f"NO OPTIMAL MODELS FOUND ON SUBSET_SIZE={subset_size}")
         self.best_models_dict[subset_size] = deepcopy(self.best_models)
         return best_models_not_filtered
 
