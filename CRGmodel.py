@@ -27,7 +27,7 @@ from utils import get_1var_importance_order, get_feature_importance, add_missing
 from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
 from metrics_utils import negate_model
 from best_models import make_nan_mask, apply_nan_mask_list
-from utils import custom_eval, custom_eval2, get_best_bool_func, apply_bool_func
+from utils import apply_bool_func
 
 
 class CRG:
@@ -234,103 +234,158 @@ class CRG:
 
 
     
-    def ensemble_predict(self, raw_df_test, y_test=None, subset_size=1, k_best=1, incremental=False):
-        print('BINARIZING TEST DATA...')
-        df_test = self.binarizer.transform(raw_df_test)
-        df_test_dict = {}
-        for col in df_test.columns:
-            df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
-        result = []
-        variables = list(map(chr, range(122, 122-subset_size,-1)))
-        test_df_len = len(df_test)
-        if not incremental:
-            if isinstance(k_best, int):
-                if subset_size not in self.best_models_dict:
-                    print(f"The algorithm did not run for subset_size={subset_size}")
-                    return None
-                models = self.best_models_dict[subset_size][:k_best]
-                for model_dict in models:
-                    columns = model_dict['columns']
-                    nan_mask = np.full_like(df_test.shape[0], True, dtype=bool)
-                    df_np_cols = []
-                    df_nan_cols = []
-                    for col in columns:
-                        df_np_cols.append(df_test_dict[col]['data'])
-                        df_nan_cols.append(df_test_dict[col]['nan_mask'])
-                    df_np_cols = np.array(df_np_cols)
-                    df_nan_cols = np.array(df_nan_cols)
-                    local_dict = {}
-                    for i in range(len(variables)):
-                        local_dict[variables[i]] = df_np_cols[i]
-                    expr = model_dict['expr']
-                    # tmp = ne.evaluate(expr, local_dict=local_dict)
-                    tmp = custom_eval(expr, local_dict, test_df_len)
-                    # tmp = custom_eval2(expr, local_dict, test_df_len)
-                    result.append(tmp)
-                result = np.stack(result, axis=-1)
-                print(result.shape)
-                result = np.rint(np.mean(result, axis=1)).astype(bool)
-            return result
-        else:
-            predictions_df = {
-                "subset_size": [],
-                "ensemble_size": [],
-                "f1_1": [],
-                "f1_0": [],
-                "precision_1": [],
-                "precision_0": [],
-                "recall_1": [],
-                "recall_0": [],
-                "rocauc": [],
-                "accuracy": [],
-            }
-            for curent_size in range(1, subset_size+1):
-                for ensemble_size in range(1, k_best+1):
-                    result = []
-                    print(f"SUBSET_SIZE: {curent_size}, ENSEMBLE_SIZE: {ensemble_size}")
-                    models = self.best_models_dict[curent_size][:ensemble_size]
-                    for model_dict in models:
-                        columns = model_dict['columns']
-                        nan_mask = np.full_like(df_test.iloc[:, 0], True, dtype=bool)
-                        local_dict = {}
-                        df_nan_cols = []
-                        for i in range(curent_size):
-                            local_dict[variables[i]] = df_test_dict[columns[i]]['data']
-                            df_nan_cols.append(df_test_dict[columns[i]]['nan_mask'])
-                        df_nan_cols = np.array(df_nan_cols)
-                        nan_mask = make_nan_mask(nan_mask, df_nan_cols, curent_size)
-                        expr = model_dict['expr']
-                        # tmp = ne.evaluate(expr, local_dict=local_dict)
-                        tmp = custom_eval(expr, local_dict, test_df_len)
-                        # tmp = custom_eval2(expr, local_dict, test_df_len)
-                        result.append(tmp)
-                    result = np.stack(result, axis=-1)
-                    result = np.rint(np.mean(result, axis=1)).astype(float)
-                    result = apply_nan_mask_list(result, nan_mask)
-                    tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
-                    precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
-                    precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
-                    recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
-                    f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
+    # def ensemble_predict(self, raw_df_test, y_test=None, subset_size=1, k_best=1, incremental=False):
+    #     print('BINARIZING TEST DATA...')
+    #     df_test = self.binarizer.transform(raw_df_test)
+    #     df_test_dict = {}
+    #     for col in df_test.columns:
+    #         df_test_dict[col] = {'data': df_test[col].values.astype(bool), 'nan_mask': pd.isna(df_test[col]).values}
+    #     result = []
+    #     variables = list(map(chr, range(122, 122-subset_size,-1)))
+    #     test_df_len = len(df_test)
+    #     if not incremental:
+    #         if isinstance(k_best, int):
+    #             if subset_size not in self.best_models_dict:
+    #                 print(f"The algorithm did not run for subset_size={subset_size}")
+    #                 return None
+    #             models = self.best_models_dict[subset_size][:k_best]
+    #             for model_dict in models:
+    #                 columns = model_dict['columns']
+    #                 nan_mask = np.full_like(df_test.shape[0], True, dtype=bool)
+    #                 df_np_cols = []
+    #                 df_nan_cols = []
+    #                 for col in columns:
+    #                     df_np_cols.append(df_test_dict[col]['data'])
+    #                     df_nan_cols.append(df_test_dict[col]['nan_mask'])
+    #                 df_np_cols = np.array(df_np_cols)
+    #                 df_nan_cols = np.array(df_nan_cols)
+    #                 local_dict = {}
+    #                 for i in range(len(variables)):
+    #                     local_dict[variables[i]] = df_np_cols[i]
+    #                 expr = model_dict['expr']
+    #                 # tmp = ne.evaluate(expr, local_dict=local_dict)
+    #                 tmp = custom_eval(expr, local_dict, test_df_len)
+    #                 # tmp = custom_eval2(expr, local_dict, test_df_len)
+    #                 result.append(tmp)
+    #             result = np.stack(result, axis=-1)
+    #             print(result.shape)
+    #             result = np.rint(np.mean(result, axis=1)).astype(bool)
+    #         return result
+    #     else:
+    #         predictions_df = {
+    #             "subset_size": [],
+    #             "ensemble_size": [],
+    #             "f1_1": [],
+    #             "f1_0": [],
+    #             "precision_1": [],
+    #             "precision_0": [],
+    #             "recall_1": [],
+    #             "recall_0": [],
+    #             "rocauc": [],
+    #             "accuracy": [],
+    #         }
+    #         for curent_size in range(1, subset_size+1):
+    #             for ensemble_size in range(1, k_best+1):
+    #                 result = []
+    #                 print(f"SUBSET_SIZE: {curent_size}, ENSEMBLE_SIZE: {ensemble_size}")
+    #                 models = self.best_models_dict[curent_size][:ensemble_size]
+    #                 for model_dict in models:
+    #                     columns = model_dict['columns']
+    #                     nan_mask = np.full_like(df_test.iloc[:, 0], True, dtype=bool)
+    #                     local_dict = {}
+    #                     df_nan_cols = []
+    #                     for i in range(curent_size):
+    #                         local_dict[variables[i]] = df_test_dict[columns[i]]['data']
+    #                         df_nan_cols.append(df_test_dict[columns[i]]['nan_mask'])
+    #                     df_nan_cols = np.array(df_nan_cols)
+    #                     nan_mask = make_nan_mask(nan_mask, df_nan_cols, curent_size)
+    #                     expr = model_dict['expr']
+    #                     # tmp = ne.evaluate(expr, local_dict=local_dict)
+    #                     tmp = custom_eval(expr, local_dict, test_df_len)
+    #                     # tmp = custom_eval2(expr, local_dict, test_df_len)
+    #                     result.append(tmp)
+    #                 result = np.stack(result, axis=-1)
+    #                 result = np.rint(np.mean(result, axis=1)).astype(float)
+    #                 result = apply_nan_mask_list(result, nan_mask)
+    #                 tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
+    #                 precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
+    #                 precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
+    #                 recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
+    #                 f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
 
-                    predictions_df["subset_size"].append(curent_size)
-                    predictions_df["ensemble_size"].append(ensemble_size)
-                    predictions_df["f1_1"].append(f1)
-                    predictions_df["f1_0"].append(f1_0)
-                    predictions_df["precision_1"].append(precision)
-                    predictions_df["precision_0"].append(precision_0)
-                    predictions_df["recall_1"].append(recall)
-                    predictions_df["recall_0"].append(recall_0)
-                    predictions_df["rocauc"].append(rocauc)
-                    predictions_df["accuracy"].append(accuracy)
-                    # print(classification_report(y_test, result))
-                    print(f"f1_1: {f1}  f1_0: {f1_0}")
-                    print(f"precision_1: {precision}  precision_0: {precision_0}")
-                    print(f"recall_1: {recall}  recall_0: {recall_0}")
-                    print(f"rocauc: {rocauc}  accuracy: {accuracy}")
-                    print()
-            predictions_df = pd.DataFrame(predictions_df)
-            predictions_df.to_excel(f"./Output/BestModels_{self.project_name}_test.xlsx", index=False, freeze_panes=(1,1))
+    #                 predictions_df["subset_size"].append(curent_size)
+    #                 predictions_df["ensemble_size"].append(ensemble_size)
+    #                 predictions_df["f1_1"].append(f1)
+    #                 predictions_df["f1_0"].append(f1_0)
+    #                 predictions_df["precision_1"].append(precision)
+    #                 predictions_df["precision_0"].append(precision_0)
+    #                 predictions_df["recall_1"].append(recall)
+    #                 predictions_df["recall_0"].append(recall_0)
+    #                 predictions_df["rocauc"].append(rocauc)
+    #                 predictions_df["accuracy"].append(accuracy)
+    #                 # print(classification_report(y_test, result))
+    #                 print(f"f1_1: {f1}  f1_0: {f1_0}")
+    #                 print(f"precision_1: {precision}  precision_0: {precision_0}")
+    #                 print(f"recall_1: {recall}  recall_0: {recall_0}")
+    #                 print(f"rocauc: {rocauc}  accuracy: {accuracy}")
+    #                 print()
+    #         predictions_df = pd.DataFrame(predictions_df)
+    #         predictions_df.to_excel(f"./Output/BestModels_{self.project_name}_test.xlsx", index=False, freeze_panes=(1,1))
+
+
+    def get_best_bool_func(self, features):
+        n_features = features.shape[1]
+        n_combinations = 2 ** n_features
+        bool_func = np.zeros(n_combinations, dtype=int)
+        indices = np.dot(features, 2**np.arange(n_features)[::-1])
+
+        for i in range(n_combinations):
+            mask = indices == i
+            tp_true = len(self.y_true[mask & (self.y_true == True)])
+            fp_true = len(self.y_true[mask & (self.y_true == False)])
+            tn_true = len(self.y_true[~mask & (self.y_true == False)])
+            fn_true = len(self.y_true[~mask & (self.y_true == True)])
+            
+            fn_false = tp_true
+            tn_false = fp_true
+            fp_false = tn_true
+            tp_false = fn_true
+
+            precision_true, recall_true, f1_true, rocauc_true, accuracy_true, fpr_true = calculate_metrics_for(tp_true, 
+                                                                                                            fp_true, 
+                                                                                                            fn_true, 
+                                                                                                            tn_true)
+            
+            precision_false, recall_false, f1_false, rocauc_false, accuracy_false, fpr_false = calculate_metrics_for(tp_false, 
+                                                                                                            fp_false, 
+                                                                                                            fn_false, 
+                                                                                                            tn_false)
+            if self.quality_metric == 'f1_1':
+                if f1_true >= f1_false:
+                    bool_func[i] = True
+                else:
+                    bool_func[i] = False
+            elif self.quality_metric == 'precision_1':
+                if precision_true >= precision_false:
+                    bool_func[i] = True
+                else:
+                    bool_func[i] = False
+            elif self.quality_metric == 'recall_1':
+                if recall_true >= recall_false:
+                    bool_func[i] = True
+                else:
+                    bool_func[i] = False 
+            elif self.quality_metric == 'rocauc':
+                if rocauc_true >= rocauc_false:
+                    bool_func[i] = True
+                else:
+                    bool_func[i] = False
+            elif self.quality_metric == 'accuracy':
+                if accuracy_true >= accuracy_false:
+                    bool_func[i] = True
+                else:
+                    bool_func[i] = False
+        return bool_func
 
 
     def worker_init(self):
@@ -358,7 +413,7 @@ class CRG:
             df_nan_cols = np.array(df_nan_cols)
             nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
             nan_count = np.count_nonzero(nan_mask)
-            bool_func = get_best_bool_func(features_subset, self.y_true)
+            bool_func = self.get_best_bool_func(features_subset)
             result = apply_bool_func(features_subset, bool_func)
             result = apply_nan_mask_list(result, nan_mask)
             tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
