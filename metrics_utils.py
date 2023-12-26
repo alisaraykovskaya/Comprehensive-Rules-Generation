@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import vectorize
 import re
+from typing import List, Tuple
 # from viztracer import log_sparse
 
 
@@ -37,25 +38,14 @@ def count_confusion_matrix(y_true, y_pred):
     return tp, fp, fn, tn
 
 
-def calculate_metrics_for(tp, fp, fn, tn):
+def calculate_metrics_from_conf_matrix(tp: int, fp: int, fn: int, tn: int) -> Tuple[float]:
     precision = 0 if (tp + fp) == 0 else tp / (tp + fp)
     recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
     f1 = 0 if (precision + recall) == 0 else 2 * (precision * recall) / (precision + recall)
     fpr = 0 if (fp + tn) == 0 else fp / (fp + tn)
     rocauc = (1 + recall - fpr) / 2
     accuracy = 0 if (tp + fp + fn + tn) == 0 else (tp + tn) / (tp + fp + fn + tn)
-    return precision, recall, f1, rocauc, accuracy, fpr
-
-
-def calculate_metrics_for_negation(recall, fpr, accuracy, precision_0):
-    precision = 1 - precision_0
-    recall = 1 - recall
-    f1 = 0 if (precision + recall) == 0 else 2 * (precision * recall) / (precision + recall)
-    fpr = 1 - fpr
-    rocauc = (1 + recall - fpr) / 2
-    accuracy = 1 - accuracy
     return precision, recall, f1, rocauc, accuracy
-
 
 
 @vectorize

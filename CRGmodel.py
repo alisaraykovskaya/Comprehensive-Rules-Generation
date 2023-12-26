@@ -24,10 +24,11 @@ from numba import njit
 
 from utils import model_string_gen, simplify_expr, find_sum, sums_generator, similarity_filtering, list_to_df, post_simplify, beautify_simple, beautify_summed
 from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string, get_readable_size
-from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, calculate_metrics_for, get_parent_set, calculate_metrics_for_negation
-from metrics_utils import negate_model
-from best_models import make_nan_mask, apply_nan_mask_list
+from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, get_parent_set
+from metrics_utils import negate_model, calculate_metrics_from_conf_matrix
+from utils import make_nan_mask, apply_nan_mask_list
 from utils import apply_bool_func
+from itertools import product
 
 
 class CRG:
@@ -203,7 +204,7 @@ class CRG:
                 result = apply_bool_func(features_subset, bool_func)
                 result = apply_nan_mask_list(result, nan_mask)
                 tp, fp, fn, tn = count_confusion_matrix(y_test.values, result)
-                precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
+                precision, recall, f1, rocauc, accuracy = calculate_metrics_from_conf_matrix(tp, fp, fn, tn)
                 precision_0 = 0 if (tn + fn) == 0 else tn / (tn + fn)
                 recall_0 = 0 if (tn + fp) == 0 else tn / (tn + fp)
                 f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
@@ -336,56 +337,74 @@ class CRG:
     def get_best_bool_func(self, features):
         n_features = features.shape[1]
         n_combinations = 2 ** n_features
-        bool_func = np.zeros(n_combinations, dtype=int)
+        bool_func = np.zeros(n_combinations, dtype=bool)
         indices = np.dot(features, 2**np.arange(n_features)[::-1])
+
+        pos_count_by_row = np.zeros(n_combinations)
+        neg_count_by_row = np.zeros(n_combinations)
 
         for i in range(n_combinations):
             mask = indices == i
-            tp_true = len(self.y_true[mask & (self.y_true == True)])
-            fp_true = len(self.y_true[mask & (self.y_true == False)])
-            tn_true = len(self.y_true[~mask & (self.y_true == False)])
-            fn_true = len(self.y_true[~mask & (self.y_true == True)])
-            
-            fn_false = tp_true
-            tn_false = fp_true
-            fp_false = tn_true
-            tp_false = fn_true
+            pos_count_by_row[i] = len(self.y_true[mask & (self.y_true == True)])
+            neg_count_by_row[i] = len(self.y_true[mask & (self.y_true == False)])
 
-            precision_true, recall_true, f1_true, rocauc_true, accuracy_true, fpr_true = calculate_metrics_for(tp_true, 
-                                                                                                            fp_true, 
-                                                                                                            fn_true, 
-                                                                                                            tn_true)
-            
-            precision_false, recall_false, f1_false, rocauc_false, accuracy_false, fpr_false = calculate_metrics_for(tp_false, 
-                                                                                                            fp_false, 
-                                                                                                            fn_false, 
-                                                                                                            tn_false)
+        if self.quality_metric == 'accuracy':
+            bool_func[pos_count_by_row >= neg_count_by_row] = True
+            return bool_func
+        elif self.quality_metric == 'weighted_accuracy':
+            total_pos = len(self.y_true[self.y_true == True])
+            total_neg = len(self.y_true[self.y_true == False])
+            bool_func[pos_count_by_row/total_pos >= neg_count_by_row/total_neg] = True
+        else:
+            all_outputs = list(product([False, True], repeat=n_combinations))
+            precision_list = np.zeros(len(all_outputs))
+            recall_list = np.zeros(len(all_outputs))
+            f1_list = np.zeros(len(all_outputs))
+            rocauc_list = np.zeros(len(all_outputs))
+            half_len = len(all_outputs) // 2
+            for i in range(half_len):
+                formula_output = np.array(all_outputs[i])
+                mask_pos = formula_output == True
+                mask_neg = formula_output == False
+                tp = np.sum(pos_count_by_row[mask_pos])
+                # FP - это все positive counts, которые попадают под отрицательные outputs
+                fp = np.sum(neg_count_by_row[mask_pos])
+                # TN - это все negative counts, которые попадают под отрицательные outputs
+                tn = np.sum(neg_count_by_row[mask_neg])
+                # FP - это все positive counts, которые попадают под отрицательные outputs
+                fn = np.sum(pos_count_by_row[mask_neg])
+                precision, recall, f1, rocauc, accuracy = calculate_metrics_from_conf_matrix(tp, fp, fn, tn)
+                fn_neg = tp
+                tn_neg = fp
+                fp_neg = tn
+                tp_neg = fn
+                precision_neg, recall_neg, f1_neg, rocauc_neg, accuracy_neg = calculate_metrics_from_conf_matrix(tp_neg, fp_neg, fn_neg, tn_neg)
+                precision_list[i] = precision
+                recall_list[i] = recall
+                f1_list[i] = f1
+                rocauc_list[i] = rocauc
+                
+                precision_list[-i-1] = precision_neg
+                recall_list[-i-1] = recall_neg
+                f1_list[-i-1] = f1_neg
+                rocauc_list[-i-1] = rocauc_neg
+
             if self.quality_metric == 'f1_1':
-                if f1_true >= f1_false:
-                    bool_func[i] = True
-                else:
-                    bool_func[i] = False
-            elif self.quality_metric == 'precision_1':
-                if precision_true >= precision_false:
-                    bool_func[i] = True
-                else:
-                    bool_func[i] = False
-            elif self.quality_metric == 'recall_1':
-                if recall_true >= recall_false:
-                    bool_func[i] = True
-                else:
-                    bool_func[i] = False 
+                idx = np.argmax(f1_list)
+
             elif self.quality_metric == 'rocauc':
-                if rocauc_true >= rocauc_false:
-                    bool_func[i] = True
-                else:
-                    bool_func[i] = False
-            elif self.quality_metric == 'accuracy':
-                if accuracy_true >= accuracy_false:
-                    bool_func[i] = True
-                else:
-                    bool_func[i] = False
-        return bool_func
+                idx = np.argmax(rocauc_list)
+
+            elif self.quality_metric == 'recall_1':
+                idx = np.argmax(recall_list)
+
+            elif self.quality_metric == 'precision_1':
+                idx = np.argmax(precision_list)
+
+            else:
+                raise Exception("Wrong quality metric")
+
+            return np.array(all_outputs[idx])
 
 
     def worker_init(self):
@@ -401,6 +420,7 @@ class CRG:
         count = 0
         df_len = len(self.df)
         algebra = boolean.BooleanAlgebra()
+        all_formulas_number = 0
         for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
@@ -417,7 +437,7 @@ class CRG:
             result = apply_bool_func(features_subset, bool_func)
             result = apply_nan_mask_list(result, nan_mask)
             tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
-            precision, recall, f1, rocauc, accuracy, fpr = calculate_metrics_for(tp, fp, fn, tn)
+            precision, recall, f1, rocauc, accuracy = calculate_metrics_from_conf_matrix(tp, fp, fn, tn)
 
             if self.quality_metric == 'f1_1':
                 quality = f1
@@ -427,7 +447,7 @@ class CRG:
                 quality = recall
             elif self.quality_metric == 'rocauc':
                 quality = rocauc
-            elif self.quality_metric == 'accuracy':
+            elif self.quality_metric == 'accuracy' or self.quality_metric == 'weighted_accuracy':
                 quality = accuracy
 
             if quality > min_quality:

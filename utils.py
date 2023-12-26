@@ -6,6 +6,7 @@ from math import factorial
 import operator
 import re
 import numpy as np
+from numba import njit
 
 from metrics_utils import compare_model_similarity
 # from viztracer import log_sparse
@@ -137,6 +138,23 @@ def outputs_to_model_string(output, vars_num, variables):
         terms = ['False']
     expr = ' | '.join(terms)
     return expr
+
+
+# @log_sparse
+@njit
+def make_nan_mask(nan_mask, df_nan_cols, subset_size):
+    for i in range(subset_size):
+        nan_mask &= df_nan_cols[i]
+    return nan_mask
+
+
+# @log_sparse
+@njit
+def apply_nan_mask_list(pred, nan_mask):
+    for i in range(len(pred)):
+        if nan_mask[i]:
+            pred[i] = np.nan
+    return pred
 
 
 def get_1var_importance_config(main_config, columns_number):

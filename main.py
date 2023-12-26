@@ -8,10 +8,12 @@ from copy import deepcopy
 
 dataset_names = [
     "heart",
-    "diabetes",
-    "churn",
-    "bank",
-    "hepatitis",
+    "DivideBy30",
+    "DivideBy30Remainder"
+    # "diabetes",
+    # "churn",
+    # "bank",
+    # "hepatitis",
 ]
 
 config = {
@@ -21,7 +23,7 @@ config = {
     },
 
     "rules_generation_params": {
-        "quality_metric": "f1", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
+        "quality_metric": "accuracy", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
         "subset_size": 3, # number of variables for boolean formula in models
 
         "process_number": 10, # int or "default" = 90% of cpu

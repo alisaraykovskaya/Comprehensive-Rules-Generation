@@ -57,23 +57,6 @@ global crop_number_in_workers
 global excessive_models_num_coef
 
 
-# @log_sparse
-@njit
-def make_nan_mask(nan_mask, df_nan_cols, subset_size):
-    for i in range(subset_size):
-        nan_mask &= df_nan_cols[i]
-    return nan_mask
-
-
-# @log_sparse
-@njit
-def apply_nan_mask_list(pred, nan_mask):
-    for i in range(len(pred)):
-        if nan_mask[i]:
-            pred[i] = np.nan
-    return pred
-
-
 def worker(start_idx, end_idx, min_quality):
     best_models = []
     for columns in islice(combinations(columns_ordered, subset_size), start_idx, end_idx):
