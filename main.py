@@ -8,12 +8,12 @@ from copy import deepcopy
 
 dataset_names = [
     "heart",
-    "DivideBy30",
-    "DivideBy30Remainder"
-    # "diabetes",
-    # "churn",
-    # "bank",
-    # "hepatitis",
+    # "DivideBy30",
+    # "DivideBy30Remainder"
+    "diabetes",
+    "churn",
+    "bank",
+    "hepatitis",
 ]
 
 config = {
@@ -23,22 +23,22 @@ config = {
     },
 
     "rules_generation_params": {
-        "quality_metric": "accuracy", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
-        "subset_size": 3, # number of variables for boolean formula in models
+        "quality_metric": "f1", # 'f1', 'accuracy', 'rocauc', 'recall', 'precision'
+        "subset_size": 4, # number of variables for boolean formula in models
 
-        "process_number": 10, # int or "default" = 90% of cpu
+        "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload. number_of_models = batch_size * formula_number
-        "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel between reloads best_models will contain similar models. May lead to not reproducible results.
+        "filter_similar_between_reloads": True, # If true filter similar models between reloads, otherwise saved in excel between reloads best_models will contain similar models. May lead to not reproducible results.
         
         "crop_number": 4000, # crop number of best models after every reload
         "crop_number_in_workers": 4000, # crop the number of best models in worker if it accumulated more than (crop_number_in_workers * excessive_models_num_coef) models. If less than crop_number, it may lead to unstable results
         "excessive_models_num_coef": 3, # used for computing cropping threshold in workers
         
         "dataset_frac": 1, # use only fraction of training dataset, use this if algorithm running too long
-        "crop_features": 50, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
-        "crop_parent_features": 50,
+        "crop_features": 80, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
+        "crop_parent_features": 80,
 
-        "complexity_restr_operators": 4, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
+        "complexity_restr_operators": 5, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
 
         "time_restriction_seconds": 500000, # Limiting the running time of the algorithm per subset_size
@@ -51,7 +51,7 @@ config = {
     "similarity_filtering_params": {
         "sim_metric": "PARENT", # "JAC_SCORE"
         "min_jac_score": 0.9, # JAC_SCORE threshold
-        "min_same_parents": 3 # PARENT sim threshold
+        "min_same_parents": 4 # PARENT sim threshold
     },
   
     "binarizer_params": {

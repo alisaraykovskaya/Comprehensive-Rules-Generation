@@ -119,6 +119,8 @@ class CRG:
 
         print('BINARIZING DATA...')
         self.df = self.binarizer.fit_transform(self.raw_df)
+        # if self.project_name == "DivideBy30":
+        #     self.df = self.df[['Div_By_15=True', 'Div_By_10=True', 'Div_By_6=True', 'Target']]
         self.parent_features_dict = self.binarizer.parent_features_dict
 
         # using only fraction of dataset
@@ -356,14 +358,14 @@ class CRG:
             total_neg = len(self.y_true[self.y_true == False])
             bool_func[pos_count_by_row/total_pos >= neg_count_by_row/total_neg] = True
         else:
-            all_outputs = list(product([False, True], repeat=n_combinations))
-            precision_list = np.zeros(len(all_outputs))
-            recall_list = np.zeros(len(all_outputs))
-            f1_list = np.zeros(len(all_outputs))
-            rocauc_list = np.zeros(len(all_outputs))
-            half_len = len(all_outputs) // 2
-            for i in range(half_len):
-                formula_output = np.array(all_outputs[i])
+            formulas_len_with_neg = len(self.all_formulas) * 2
+            formulas_len_no_neg = len(self.all_formulas)
+            precision_list = np.zeros(formulas_len_with_neg)
+            recall_list = np.zeros(formulas_len_with_neg)
+            f1_list = np.zeros(formulas_len_with_neg)
+            rocauc_list = np.zeros(formulas_len_with_neg)
+            for i, formula_info in enumerate(self.all_formulas):
+                formula_output = formula_info["output"]
                 mask_pos = formula_output == True
                 mask_neg = formula_output == False
                 tp = np.sum(pos_count_by_row[mask_pos])
@@ -379,15 +381,16 @@ class CRG:
                 fp_neg = tn
                 tp_neg = fn
                 precision_neg, recall_neg, f1_neg, rocauc_neg, accuracy_neg = calculate_metrics_from_conf_matrix(tp_neg, fp_neg, fn_neg, tn_neg)
+                
                 precision_list[i] = precision
                 recall_list[i] = recall
                 f1_list[i] = f1
                 rocauc_list[i] = rocauc
                 
-                precision_list[-i-1] = precision_neg
-                recall_list[-i-1] = recall_neg
-                f1_list[-i-1] = f1_neg
-                rocauc_list[-i-1] = rocauc_neg
+                precision_list[i+formulas_len_no_neg] = precision_neg
+                recall_list[i+formulas_len_no_neg] = recall_neg
+                f1_list[i+formulas_len_no_neg] = f1_neg
+                rocauc_list[i+formulas_len_no_neg] = rocauc_neg
 
             if self.quality_metric == 'f1_1':
                 idx = np.argmax(f1_list)
@@ -404,7 +407,13 @@ class CRG:
             else:
                 raise Exception("Wrong quality metric")
 
-            return np.array(all_outputs[idx])
+            if idx < len(self.all_formulas):
+                negated = False
+            else:
+                negated = True
+                idx = idx - formulas_len_no_neg
+
+            return self.all_formulas[idx], negated
 
 
     def worker_init(self):
@@ -417,10 +426,7 @@ class CRG:
         else:
             crop_number_in_workers = self.crop_number_in_workers
         best_models = []
-        count = 0
-        df_len = len(self.df)
         algebra = boolean.BooleanAlgebra()
-        all_formulas_number = 0
         for columns_tuple in islice(combinations(self.columns_ordered, subset_size), start_idx, end_idx):
             columns = list(columns_tuple)
             nan_mask = np.full_like(self.y_true, True, dtype=bool)
@@ -433,8 +439,24 @@ class CRG:
             df_nan_cols = np.array(df_nan_cols)
             nan_mask = make_nan_mask(nan_mask, df_nan_cols, subset_size)
             nan_count = np.count_nonzero(nan_mask)
-            bool_func = self.get_best_bool_func(features_subset)
-            result = apply_bool_func(features_subset, bool_func)
+            formula_info, negated = self.get_best_bool_func(features_subset)
+
+            if negated:
+                output_key = "neg_output"
+                simple_formula_key = "neg_simple_formula"
+                summed_formula_key = "neg_summed_formula"
+                readable_formula_key = "neg_readable_formula"
+                number_of_binary_operators_key = "neg_number_of_binary_operators"
+                max_freq_of_variables_key = "neg_max_freq_of_variables"
+            else:
+                output_key = "output"
+                simple_formula_key = "simple_formula"
+                summed_formula_key = "summed_formula"
+                readable_formula_key = "readable_formula"
+                number_of_binary_operators_key = "number_of_binary_operators"
+                max_freq_of_variables_key = "max_freq_of_variables"
+
+            result = apply_bool_func(features_subset, formula_info[output_key])
             result = apply_nan_mask_list(result, nan_mask)
             tp, fp, fn, tn = count_confusion_matrix(self.y_true, result)
             precision, recall, f1, rocauc, accuracy = calculate_metrics_from_conf_matrix(tp, fp, fn, tn)
@@ -456,33 +478,15 @@ class CRG:
                 f1_0 = 0 if (precision_0 + recall_0) == 0 else 2 * (precision_0 * recall_0) / (precision_0 + recall_0)
                 columns_set = get_parent_set(columns)
                 elapsed_time = time() - self.start_time
-                dnf_formula = outputs_to_model_string(bool_func, subset_size, variables)
-                simple_formula = simplify_expr(dnf_formula, subset_size, variables, algebra)
-                actual_subset_size = count_actual_subset_size(simple_formula)
-                if actual_subset_size < subset_size:
-                    continue
-                number_of_binary_operators = count_operators(simple_formula)
-                max_freq_of_variables = count_vars(simple_formula)
-                if self.restrict_complexity_after_size < subset_size:
-                    if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
-                        all_formulas_number += 1
-                        continue
-                    if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
-                        all_formulas_number += 1
-                        continue
-
-                summed_formula = find_sum(sums_generator(subset_size), simple_formula)
-                readable_formula = simple_formula
-                for i in range(subset_size):
-                    readable_formula = readable_formula.replace(variables[i], f'var[{i}]')
+                readable_formula = formula_info[readable_formula_key]
                 for i in range(subset_size):
                     readable_formula = readable_formula.replace(f"var[{i}]", columns[i])
                 model_info = {'f1_1': f1, 'f1_0': f1_0, 'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp, 'precision_1': precision, 'precision_0': precision_0,\
-                    'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'bool_func': bool_func, \
-                    'summed_expr': summed_formula, 'columns': columns, 'expr': simple_formula, 'expr_len': len(simple_formula), 'readable_formula': readable_formula, 'columns_set': columns_set, \
-                    'number_of_binary_operators': number_of_binary_operators, 'max_freq_of_variables': max_freq_of_variables, 'nan_ratio': nan_count/self.y_true.shape[0],}
+                    'recall_1': recall, 'recall_0': recall_0, 'rocauc': rocauc, 'accuracy': accuracy, 'elapsed_time': elapsed_time, 'bool_func': formula_info[output_key], \
+                    'summed_expr': formula_info[summed_formula_key], 'columns': columns, 'expr': formula_info[simple_formula_key], 'expr_len': len(formula_info[simple_formula_key]), 'readable_formula': readable_formula, 'columns_set': columns_set, \
+                    'number_of_binary_operators': formula_info[number_of_binary_operators_key], 'max_freq_of_variables': formula_info[max_freq_of_variables_key], 'nan_ratio': nan_count/self.y_true.shape[0],}
                 if self.sim_metric == 'JAC_SCORE':
-                    model_info['result'] = negate_model(result)
+                    model_info['result'] = result
                 else:
                     model_info['result'] = None
                 best_models.append(model_info)
@@ -492,6 +496,18 @@ class CRG:
                 if len(self.best_models) > 0:
                     min_quality = best_models[-1][self.quality_metric]
         return best_models
+    
+
+    def is_formula_suitable(self, simple_expr, subset_size, actual_subset_size, number_of_binary_operators, max_freq_of_variables):
+        if simple_expr == '1' or actual_subset_size < subset_size:
+            return False
+        if self.restrict_complexity_after_size < subset_size:
+            if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
+                return False
+            if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
+                return False
+            
+        return True
 
 
     def find_best_models(self, is_onevar):
@@ -535,7 +551,70 @@ class CRG:
         if type(self.y_true).__module__ != 'numpy':
             self.y_true = self.y_true.values.astype(float)
 
-        print(f'columns_subset_number(total_count_of_models): {subset_number}')
+        print(f'columns_subset_number: {subset_number}')
+
+        self.all_formulas = []
+        all_formulas_number = 0
+        for expr, output in model_string_gen(subset_size, variables):
+            simple_expr = simplify_expr(expr, subset_size, variables, algebra)
+            actual_subset_size = count_actual_subset_size(simple_expr)
+            number_of_binary_operators = count_operators(simple_expr)
+            max_freq_of_variables = count_vars(simple_expr)
+
+            neg_output = tuple(map(operator.not_, output))
+            neg_expr = outputs_to_model_string(neg_output, subset_size, variables)
+            neg_simple_expr = simplify_expr(neg_expr, subset_size, variables, algebra)
+            neg_actual_subset_size = count_actual_subset_size(neg_simple_expr)
+            neg_number_of_binary_operators = count_operators(neg_simple_expr)
+            neg_max_freq_of_variables = count_vars(neg_simple_expr)
+
+            summed_expr = find_sum(sums_generator(subset_size), simple_expr)
+            neg_summed_expr = find_sum(sums_generator(subset_size), neg_simple_expr)
+            
+            readable_expr = simple_expr
+            neg_readable_expr = neg_simple_expr
+            for i in range(subset_size):
+                readable_expr = readable_expr.replace(variables[i], f'var[{i}]')
+                neg_readable_expr = neg_readable_expr.replace(variables[i], f'var[{i}]')
+
+            # if number_of_binary_operators != neg_number_of_binary_operators or max_freq_of_variables != neg_max_freq_of_variables:
+            #     print("AAAAAAAAAAAAA")
+            #     print(f"{simple_expr} and {neg_simple_expr}")
+
+            # formula_info = {}
+
+            if self.is_formula_suitable(simple_expr, subset_size, actual_subset_size, number_of_binary_operators, max_freq_of_variables):
+                self.all_formulas.append({
+                    'output': np.array(output),
+                    'simple_formula': simple_expr,
+                    'summed_formula': summed_expr,
+                    'readable_formula': readable_expr,
+                    'number_of_binary_operators': number_of_binary_operators,
+                    'max_freq_of_variables': max_freq_of_variables,
+                    'neg_output': np.array(neg_output),
+                    'neg_simple_formula': neg_simple_expr,
+                    'neg_summed_formula': neg_summed_expr,
+                    'neg_readable_formula': neg_readable_expr,
+                    'neg_number_of_binary_operators': neg_number_of_binary_operators,
+                    'neg_max_freq_of_variables': neg_max_freq_of_variables
+                })
+            # if self.is_formula_suitable(neg_simple_expr, subset_size, neg_actual_subset_size, neg_number_of_binary_operators, neg_max_freq_of_variables):
+            #     self.all_formulas.append({
+            #         'output': np.array(neg_output),
+            #         'simple_formula': neg_simple_expr,
+            #         'summed_formula': neg_summed_expr,
+            #         'readable_formula': neg_readable_expr,
+            #         'number_of_binary_operators': neg_number_of_binary_operators,
+            #         'max_freq_of_variables': neg_max_freq_of_variables
+            #     })
+            # if formula_info:
+            #     self.all_formulas.append(formula_info)
+
+            all_formulas_number += 2
+        formulas_number = len(self.all_formulas)
+        print(f'formulas_number: {formulas_number}')
+        if self.restrict_complexity_after_size < subset_size:
+            print(f'all formulas number of size {subset_size}: {all_formulas_number}')
 
         if self.process_number > 1:
             worker_timer = time()
