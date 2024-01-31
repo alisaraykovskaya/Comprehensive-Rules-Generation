@@ -38,7 +38,7 @@ config = {
         "crop_features": 80, # the number of the most important features to remain in a dataset. Needed for reducing working time if dataset has too many features
         "crop_parent_features": 80,
 
-        "complexity_restr_operators": 5, # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
+        "complexity_restr_operators": "subset_size+1", # Consider Boolean formulas, only with number of binary operators less or equal than a given number. It is worth noting that the value should not be less than subset_size-1
         "complexity_restr_vars": None, # Consider Boolean formulas only with number of repetitions of one variable less or equal than a given number
 
         "time_restriction_seconds": 500000, # Limiting the running time of the algorithm per subset_size
@@ -51,7 +51,7 @@ config = {
     "similarity_filtering_params": {
         "sim_metric": "PARENT", # "JAC_SCORE"
         "min_jac_score": 0.9, # JAC_SCORE threshold
-        "min_same_parents": 4 # PARENT sim threshold
+        "min_same_parents": "subset_size" # PARENT sim threshold
     },
   
     "binarizer_params": {

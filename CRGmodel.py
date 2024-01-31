@@ -131,7 +131,7 @@ class CRG:
         self.columns_ordered = self.df.columns
         columns_number = len(self.columns_ordered)
 
-        print(f'project_name: {self.project_name}  columns_number: {columns_number}  observations_number: {self.df.shape[0]}')
+        print(f'\nproject_name: {self.project_name}  columns_number: {columns_number}  observations_number: {self.df.shape[0]}')
 
         print('\nRUNNING ON subset_size=1 TO DETERMINE INITIAL FEATURE IMPORTANCES')
         start_time = time()
@@ -502,8 +502,13 @@ class CRG:
         if simple_expr == '1' or actual_subset_size < subset_size:
             return False
         if self.restrict_complexity_after_size < subset_size:
-            if self.complexity_restr_operators is not None and number_of_binary_operators > self.complexity_restr_operators:
-                return False
+            if self.complexity_restr_operators is not None:
+                if self.complexity_restr_operators == "subset_size+1":
+                    complexity_restr_operators = subset_size + 1
+                else:
+                    complexity_restr_operators = self.complexity_restr_operators
+                if number_of_binary_operators > complexity_restr_operators:
+                    return False
             if self.complexity_restr_vars is not None and max_freq_of_variables > self.complexity_restr_vars:
                 return False
             
@@ -520,6 +525,11 @@ class CRG:
             crop_number = self.onevar_crop_number
             sim_metric = self.onevar_sim_metric
             min_same_parents = self.onevar_min_same_parents
+        elif self.min_same_parents == "subset_size":
+            subset_size = self.subset_size
+            crop_number = self.crop_number
+            sim_metric = self.sim_metric
+            min_same_parents = self.subset_size
         else:
             subset_size = self.subset_size
             crop_number = self.crop_number
@@ -612,7 +622,7 @@ class CRG:
 
             all_formulas_number += 2
         formulas_number = len(self.all_formulas)
-        print(f'formulas_number: {formulas_number}')
+        print(f'formulas_number: {formulas_number}  ({formulas_number*2} with negated)')
         if self.restrict_complexity_after_size < subset_size:
             print(f'all formulas number of size {subset_size}: {all_formulas_number}')
 
