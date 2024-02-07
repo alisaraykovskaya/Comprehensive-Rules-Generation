@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from numba import vectorize
-import re
+# import re
 from typing import List, Tuple
 # from viztracer import log_sparse
 

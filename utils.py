@@ -4,7 +4,7 @@ import os.path
 import copy
 from math import factorial
 import operator
-import re
+# import re
 import numpy as np
 from numba import njit
 

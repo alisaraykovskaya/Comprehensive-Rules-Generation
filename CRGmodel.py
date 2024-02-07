@@ -2,7 +2,7 @@ from os import path, mkdir
 import platform
 from time import time
 from math import factorial
-from multiprocessing import freeze_support, cpu_count, Pool, current_process
+from multiprocessing import freeze_support, cpu_count, Pool
 from itertools import combinations, chain, islice
 from copy import deepcopy
 import operator
@@ -12,23 +12,26 @@ import itertools
 # from memory_profiler import profile
 # import sys
 # import gc
-import numexpr as ne
+# import numexpr as ne
 
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, accuracy_score, classification_report
+# from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, accuracy_score, classification_report
 
 import boolean
-from numba import njit
+# from numba import njit
 
-from utils import model_string_gen, simplify_expr, find_sum, sums_generator, similarity_filtering, list_to_df, post_simplify, beautify_simple, beautify_summed
-from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string, get_readable_size
+from utils import model_string_gen, simplify_expr, find_sum, sums_generator, similarity_filtering, list_to_df, beautify_simple, beautify_summed
+from utils import get_1var_importance_order, get_feature_importance, add_missing_features, outputs_to_model_string
 from metrics_utils import count_actual_subset_size, count_operators, count_vars, count_confusion_matrix, get_parent_set
-from metrics_utils import negate_model, calculate_metrics_from_conf_matrix
+from metrics_utils import calculate_metrics_from_conf_matrix
 from utils import make_nan_mask, apply_nan_mask_list
 from utils import apply_bool_func
-from itertools import product
+# from itertools import product
+
+# import cProfile
+# import pstats
 
 
 class CRG:

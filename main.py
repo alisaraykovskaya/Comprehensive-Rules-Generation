@@ -2,7 +2,6 @@ from loadData import LoadData
 from binarizerClass import Binarizer
 from CRGmodel import CRG
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
 from copy import deepcopy
 
 
@@ -28,7 +27,7 @@ config = {
 
         "process_number": "default", # int or "default" = 90% of cpu
         "batch_size": 10000, # number of subsets, which each worker will be processing on every reload. number_of_models = batch_size * formula_number
-        "filter_similar_between_reloads": True, # If true filter similar models between reloads, otherwise saved in excel between reloads best_models will contain similar models. May lead to not reproducible results.
+        "filter_similar_between_reloads": False, # If true filter similar models between reloads, otherwise saved in excel between reloads best_models will contain similar models. May lead to not reproducible results.
         
         "crop_number": 4000, # crop number of best models after every reload
         "crop_number_in_workers": 4000, # crop the number of best models in worker if it accumulated more than (crop_number_in_workers * excessive_models_num_coef) models. If less than crop_number, it may lead to unstable results
