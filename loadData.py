@@ -154,53 +154,53 @@ def LoadData(project_name, load_from_pkl=False):
       file_ext = "csv"
 ######################## Datasets for a paper #############################
 ###### Train Data #############
-    elif project_name == "heart_train":
-      df_name = "Train/heart_train"
+    elif project_name.startswith("heart_train"):
+      df_name = f"heart/Train/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "bank_train":
-      df_name = "Train/bank_train"
+    elif project_name.startswith("bank_train"):
+      df_name = f"bank/Train/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "churn_train":
-      df_name = "Train/churn_train"
+    elif project_name.startswith("churn_train"):
+      df_name = f"churn/Train/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "diabetes_train":
-      df_name = "Train/diabetes_train"
+    elif project_name.startswith("diabetes_train"):
+      df_name = f"diabetes/Train/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "hepatitis_train":
-      df_name = "Train/hepatitis_train"
+    elif project_name.startswith("hepatitis_train"):
+      df_name = f"hepatitis/Train/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "heart_test":
-      df_name = "Test/heart_test"
+    elif project_name.startswith("heart_test"):
+      df_name = f"heart/Test/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "bank_test":
-      df_name = "Test/bank_test"
+    elif project_name.startswith("bank_test"):
+      df_name = f"bank/Test/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "churn_test":
-      df_name = "Test/churn_test"
+    elif project_name.startswith("churn_test"):
+      df_name = f"churn/Test/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "diabetes_test":
-      df_name = "Test/diabetes_test"
+    elif project_name.startswith("diabetes_test"):
+      df_name = f"diabetes/Test/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
-    elif project_name == "hepatitis_test":
-      df_name = "Test/hepatitis_test"
+    elif project_name.startswith("hepatitis_test"):
+      df_name = f"hepatitis/Test/{project_name}"
       target_name = "Target"
       file_ext = "csv"
 
@@ -208,8 +208,8 @@ def LoadData(project_name, load_from_pkl=False):
       raise NameError('Project name is not recognized. Fix it in loadData.py file.')
       
 
-    PklFile = f'./Data/{df_name}.pkl'
-    df_path = f'./Data/{df_name}.{file_ext}'
+    PklFile = f'./NewData/{df_name}.pkl'
+    df_path = f'./NewData/{df_name}.{file_ext}'
         
     if file_ext == 'xlsx':
       df = pd.read_excel(df_path, na_values='?', keep_default_na=True)

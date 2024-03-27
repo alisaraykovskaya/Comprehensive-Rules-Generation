@@ -3,6 +3,7 @@ from binarizerClass import Binarizer
 from CRGmodel import CRG
 from sklearn.model_selection import train_test_split
 from copy import deepcopy
+import numpy as np
 
 
 dataset_names = [
@@ -70,35 +71,39 @@ already_splitted_datasets = set(["heart", "bank", "churn", "diabetes", "hepatiti
 def main():
     for dataset_name in dataset_names:
         config["load_data_params"]["project_name"] = dataset_name
-        print('LOADING DATA...')
-        if config["load_data_params"]["project_name"] in already_splitted_datasets:
-            df_train_config = deepcopy(config["load_data_params"])
-            df_train_config["project_name"] += "_train"
-            df = LoadData(**df_train_config)
-            y_train = df['Target']
-            X_train = df.drop('Target', axis=1)
+        sub_datasets_noise = [str(round(noise_level * 100, 1)).replace('.', '_') for noise_level in np.arange(0, 1.025, 0.025)]
+        for sub_dataset_noise in sub_datasets_noise:
+            print('LOADING DATA...')
+            if config["load_data_params"]["project_name"] in already_splitted_datasets:
+                df_train_config = deepcopy(config["load_data_params"])
+                df_train_config["project_name"] += "_train_" + sub_dataset_noise
+                df = LoadData(**df_train_config)
+                y_train = df['Target']
+                X_train = df.drop('Target', axis=1)
 
-            df_test_config = deepcopy(config["load_data_params"])
-            df_test_config["project_name"] += "_test"
-            X_test = LoadData(**df_test_config)
-            y_test = X_test['Target']
-            X_test.drop('Target', axis=1, inplace=True)
-        else:
-            df = LoadData(**config["load_data_params"])
-            y_true = df['Target']
-            df.drop('Target', axis=1, inplace=True)
-            X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=y_true, random_state=12)
+                df_test_config = deepcopy(config["load_data_params"])
+                df_test_config["project_name"] += "_test"
+                X_test = LoadData(**df_test_config)
+                y_test = X_test['Target']
+                X_test.drop('Target', axis=1, inplace=True)
+            else:
+                df = LoadData(**config["load_data_params"])
+                y_true = df['Target']
+                df.drop('Target', axis=1, inplace=True)
+                X_train, X_test, y_train, y_test = train_test_split(df, y_true, test_size=0.2, stratify=y_true, random_state=12)
 
-        binarizer = Binarizer(**config["load_data_params"], **config["binarizer_params"])
-        crg_alg = CRG(binarizer, **config["load_data_params"], **config["rules_generation_params"], **config["similarity_filtering_params"])
+            fit_config = deepcopy(config)
+            fit_config["load_data_params"]["project_name"] += "_train_" + sub_dataset_noise
+            binarizer = Binarizer(**fit_config["load_data_params"], **fit_config["binarizer_params"])
+            crg_alg = CRG(binarizer, **fit_config["load_data_params"], **fit_config["rules_generation_params"], **fit_config["similarity_filtering_params"])
 
-        crg_alg.fit(X_train, y_train)
-        # for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
-        #     print(f'subset_size={subset_size}')
-        #     preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
-        #     print(classification_report(y_test, preds))
+            crg_alg.fit(X_train, y_train)
+            # for subset_size in range(1, config['rules_generation_params']['subset_size']+1):
+            #     print(f'subset_size={subset_size}')
+            #     preds = crg_alg.predict(raw_df_test=X_test, subset_size=subset_size, k_best=5)
+            #     print(classification_report(y_test, preds))
 
-        crg_alg.predict(raw_df_test=X_test, y_test=y_test, subset_size=config['rules_generation_params']['subset_size'], incremental=True)
+            crg_alg.predict(raw_df_test=X_test, y_test=y_test, subset_size=fit_config['rules_generation_params']['subset_size'], incremental=True)
 
 
 
